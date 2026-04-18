@@ -147,8 +147,10 @@ function calculateRoute() {
           for (let intersection of intersections.features) {
             let slice1, slice2;
             try {
-              slice1 = turf.lineSlice(s.nearestPoint, intersection, s.route);
-              slice2 = turf.lineSlice(intersection, e.nearestPoint, e.route);
+              const snap1 = turf.nearestPointOnLine(s.route, intersection);
+              const snap2 = turf.nearestPointOnLine(e.route, intersection);
+              slice1 = turf.lineSlice(s.nearestPoint, snap1, s.route);
+              slice2 = turf.lineSlice(snap2, e.nearestPoint, e.route);
             } catch(err) {
                console.error('[ERROR] lineSlice failed on intersection transfer', err);
                continue;
