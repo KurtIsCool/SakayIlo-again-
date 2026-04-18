@@ -1,0 +1,6 @@
+{
+  "name": "Iloilo Jeepney Router",
+  "description": "A local transit routing engine for Iloilo City connecting commuters around using jeepneys via Turf.js.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
