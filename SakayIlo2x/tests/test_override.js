@@ -5,7 +5,7 @@ import path from 'path';
 global.fetch = async (url) => {
   // Extract filename from URL like `/src/data/ROUTE...`
   const filename = decodeURIComponent(url.split('/').pop());
-  const filePath = path.join(process.cwd(), 'src/data', filename);
+  const filePath = path.join(process.cwd(), 'public/data', filename);
   try {
     const data = fs.readFileSync(filePath, 'utf8');
     return {

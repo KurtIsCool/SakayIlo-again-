@@ -1,14 +1,14 @@
 export const routeFiles = [
-  "ROUTE  # 1 BO. OBRERO, LAPUZ TO CITY PROPER LOOP.geojson",
-  "ROUTE # 11 LA PAZ – ILOILO CITY PROPER VIA ISATU2.geojson",
-  "ROUTE # 15A (LIKO) MOLO – ILOILO CITY PROPER VIA BALUARTE LOOP JEEPNEY ROUTE2.geojson",
-  "ROUTE # 15B (DERECHO) MOLO – ILOILO CITY PROPER VIA BALUARTE LOOP JEEPNEY ROUTE2.geojson",
-  "ROUTE # 2 CALAPARAN CALUMPANG – ILOILO CITY PROPER2.geojson",
-  "ROUTE # 3 UNGKA – ILOILO CITY PROPER VIA CPU2.geojson",
-  "ROUTE # 4 UNGKA-ILOILO CITY VIA DIVERSION FESTIVE WALK TRANSPORT HUB LOOP2.geojson",
-  "ROUTE # 5 FESTIVE WALK TRANSPORT HUB ILOILO CITY PROPER VIA SM CITY2.geojson",
-  "ROUTE # 7 COMPANIA – ILOILO CITY PROPER LOOP2.geojson",
-  "ROUTE # 9 MOHON – INFANTE LOOP2.geojson"
+  "route_11_la_paz_iloilo_city_proper_via_isatu2.geojson",
+  "route_15a_liko_molo_iloilo_city_proper_via_baluarte_loop_jeepney_route2.geojson",
+  "route_15b_derecho_molo_iloilo_city_proper_via_baluarte_loop_jeepney_route2.geojson",
+  "route_1_bo._obrero_lapuz_to_city_proper_loop.geojson",
+  "route_2_calaparan_calumpang_iloilo_city_proper2.geojson",
+  "route_3_ungka_iloilo_city_proper_via_cpu2.geojson",
+  "route_4_ungka_iloilo_city_via_diversion_festive_walk_transport_hub_loop2.geojson",
+  "route_5_festive_walk_transport_hub_iloilo_city_proper_via_sm_city2.geojson",
+  "route_7_compania_iloilo_city_proper_loop2.geojson",
+  "route_9_mohon_infante_loop2.geojson"
 ];
 
 const colors = [
@@ -34,10 +34,9 @@ function sanitizeName(filename) {
 export async function loadRoutes() {
   const allFeatures = [];
 
-  for (let i = 0; i < routeFiles.length; i++) {
-    const file = routeFiles[i];
+  const promises = routeFiles.map(async (file, i) => {
     try {
-      const response = await fetch(`/src/data/${encodeURIComponent(file)}`);
+      const response = await fetch(`./data/${encodeURIComponent(file)}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -47,7 +46,7 @@ export async function loadRoutes() {
       // Each file might be a FeatureCollection or a single Feature.
       // Usually these exports are FeatureCollections with one or more features.
       let featuresToProcess = [];
-      if (geojson.type === 'FeatureCollection') {
+      if (geojson.type === 'FeatureCollection' && geojson.features) {
         featuresToProcess = geojson.features;
       } else if (geojson.type === 'Feature') {
         featuresToProcess = [geojson];
@@ -55,9 +54,10 @@ export async function loadRoutes() {
 
       featuresToProcess.forEach((feature, index) => {
         // Only keep LineString or MultiLineString
-        if (feature.geometry && (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString')) {
+        if (feature && feature.geometry && (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString')) {
           const sanitizedFeature = {
-            ...feature,
+            type: 'Feature',
+            geometry: feature.geometry,
             properties: {
               route_id: `r_${i}_${index}`,
               route_name: sanitizeName(file),
@@ -71,7 +71,9 @@ export async function loadRoutes() {
     } catch (err) {
       console.error(`Failed to load route data: ${file}`, err);
     }
-  }
+  });
+
+  await Promise.all(promises);
 
   return {
     type: 'FeatureCollection',
