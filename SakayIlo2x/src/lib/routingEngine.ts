@@ -67,6 +67,17 @@ export function findNearbyRoutes(
 }
 
 /**
+ * Checks if a linestring forms a loop
+ */
+function isLoop(line: Feature<LineString>): boolean {
+  const coords = line.geometry.coordinates;
+  if (coords.length < 2) return false;
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  return first[0] === last[0] && first[1] === last[1];
+}
+
+/**
  * Slices a line from start point to end point
  */
 function getLineSlice(
@@ -78,13 +89,52 @@ function getLineSlice(
     const startSnapped = turf.nearestPointOnLine(line, startPt as any);
     const endSnapped = turf.nearestPointOnLine(line, endPt as any);
 
-    // Directional validation: do not allow backward travel
-    if (startSnapped.properties.location > endSnapped.properties.location) {
-      return null;
-    }
+    const locStart = startSnapped.properties.location;
+    const locEnd = endSnapped.properties.location;
 
-    // turf.lineSlice creates a segment of a LineString between two points based on where they snap to the line.
-    return turf.lineSlice(startSnapped, endSnapped, line);
+    if (isLoop(line)) {
+      const innerSlice = turf.lineSlice(startSnapped, endSnapped, line);
+      const innerDist = turf.length(innerSlice, { units: 'kilometers' });
+
+      const totalLength = turf.length(line, { units: 'kilometers' });
+      const wrapAroundDist = totalLength - innerDist;
+
+      if (innerDist <= wrapAroundDist) {
+        const coords = innerSlice.geometry.coordinates;
+        if (locStart > locEnd) {
+          coords.reverse();
+        }
+        return turf.lineString(coords);
+      } else {
+        const startCoord = line.geometry.coordinates[0];
+        const endCoord = line.geometry.coordinates[line.geometry.coordinates.length - 1];
+        const pStart = turf.point(startCoord);
+        const pEnd = turf.point(endCoord);
+
+        let part1, part2;
+        if (locStart <= locEnd) {
+          part1 = turf.lineSlice(pStart, startSnapped, line);
+          part1.geometry.coordinates.reverse();
+
+          part2 = turf.lineSlice(endSnapped, pEnd, line);
+          part2.geometry.coordinates.reverse();
+        } else {
+          part1 = turf.lineSlice(startSnapped, pEnd, line);
+          part2 = turf.lineSlice(pStart, endSnapped, line);
+        }
+
+        const mergedCoords = [...part1.geometry.coordinates];
+        mergedCoords.pop();
+        mergedCoords.push(...part2.geometry.coordinates);
+        return turf.lineString(mergedCoords);
+      }
+    } else {
+      // For linear routes, directional validation prevents backward travel
+      if (locStart > locEnd) {
+        return null;
+      }
+      return turf.lineSlice(startSnapped, endSnapped, line);
+    }
   } catch (error) {
     return null;
   }
@@ -184,8 +234,7 @@ export function findDirectRoute(
 
 /**
  * Evaluates possible 1-transfer routes
- * Real-world edge case: If routes overlap instead of just intersecting pointwise, lineIntersect 
- * captures points, but overlapping checks can be more complex. Here we use standard lineIntersect.
+ * Uses proximity-based transfers instead of strict intersection.
  */
 export function findTransferRoutes(
   start: Coord,
@@ -390,17 +439,23 @@ export function calculateCommute(
     const startPt = turf.point([startLatLng[1], startLatLng[0]]);
     const endPt = turf.point([endLatLng[1], endLatLng[0]]);
 
-    // 1. Prioritize Direct Route (Highest Priority)
     const directRoute = findDirectRoute(startPt, endPt, routes, maxWalkingDistance);
-    if (directRoute) {
+    const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);
+
+    if (directRoute && transferRoute) {
+      // Heuristic scoring: Add a 1000m "Transfer Penalty" to the total distance of any 2-ride trip.
+      // This ensures we only suggest a transfer if it is significantly faster than a direct ride.
+      const directScore = directRoute.totalDistance;
+      const transferScore = transferRoute.totalDistance + 1000;
+
+      if (transferScore < directScore) {
+        return transferRoute;
+      }
       return directRoute;
     }
 
-    // 2. Fallback to Transfer Route (Max 2 rides)
-    const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);
-    if (transferRoute) {
-      return transferRoute;
-    }
+    if (directRoute) return directRoute;
+    if (transferRoute) return transferRoute;
 
     return null;
   } catch (error) {

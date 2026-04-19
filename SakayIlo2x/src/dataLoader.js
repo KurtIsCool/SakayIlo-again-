@@ -28,7 +28,12 @@ function sanitizeName(filename) {
   let name = filename.replace(/\.geojson$/i, '');
   // Remove "route_<number>_" prefix
   name = name.replace(/^route_([0-9]+[a-zA-Z]?)_/i, '');
-  // Replace underscores with spaces
+
+  // Custom parsing for specific naming convention "La Paz Iloilo City Proper..."
+  name = name.replace(/_iloilo_city_proper/i, ' - City Proper');
+  name = name.replace(/_city_proper/i, ' - City Proper');
+
+  // Replace remaining underscores with spaces
   name = name.replace(/_/g, ' ');
   // Capitalize properly
   name = name.replace(/\b\w/g, char => char.toUpperCase());
