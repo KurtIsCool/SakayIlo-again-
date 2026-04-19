@@ -25,9 +25,13 @@ const colors = [
 ];
 
 function sanitizeName(filename) {
-  // e.g. "ROUTE  # 1 BO. OBRERO, LAPUZ TO CITY PROPER LOOP.geojson"
-  let name = filename.replace('.geojson', '');
-  name = name.replace(/ROUTE\s*#\s*\w+\s*/i, ''); // Remove "ROUTE # 1 "
+  let name = filename.replace(/\.geojson$/i, '');
+  // Remove "route_<number>_" prefix
+  name = name.replace(/^route_([0-9]+[a-zA-Z]?)_/i, '');
+  // Replace underscores with spaces
+  name = name.replace(/_/g, ' ');
+  // Capitalize properly
+  name = name.replace(/\b\w/g, char => char.toUpperCase());
   return name.trim();
 }
 

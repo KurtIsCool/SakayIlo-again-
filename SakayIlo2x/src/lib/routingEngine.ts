@@ -133,6 +133,22 @@ export function findDirectRoute(
             calculateTime(rideDistance, JEEPNEY_SPEED_KMH) +
             calculateTime(e.distance, WALKING_SPEED_KMH);
 
+          // Create line segments for walking
+          const walkToJeepSegment = turf.lineString([
+            (start as Feature<Point>).geometry.coordinates,
+            s.nearestPoint.geometry.coordinates
+          ], { mode: 'walk' });
+
+          const rideSegFeature = turf.feature(rideSegment.geometry, {
+            mode: 'jeep',
+            color: s.route.properties.color
+          });
+
+          const walkToDestSegment = turf.lineString([
+            e.nearestPoint.geometry.coordinates,
+            (end as Feature<Point>).geometry.coordinates
+          ], { mode: 'walk' });
+
           bestResult = {
             type: 'direct',
             totalDistance: Math.round(totalDistance),
@@ -156,7 +172,7 @@ export function findDirectRoute(
                 distance: Math.round(e.distance)
               }
             ],
-            pathGeoJSON: turf.featureCollection([rideSegment])
+            pathGeoJSON: turf.featureCollection([walkToJeepSegment, rideSegFeature, walkToDestSegment])
           };
         }
       }
@@ -309,12 +325,46 @@ export function findTransferRoutes(
               }
             );
 
+            // Create line segments for walking
+            const walkToJeepSegment = turf.lineString([
+              (start as Feature<Point>).geometry.coordinates,
+              s.nearestPoint.geometry.coordinates
+            ], { mode: 'walk' });
+
+            const rideSeg1Feature = turf.feature(rideSeg1.geometry, {
+              mode: 'jeep',
+              color: s.route.properties.color
+            });
+
+            // Transfer segment (snapping point of first route to snapped point on second route)
+            const snapB = turf.nearestPointOnLine(e.route as Feature<LineString>, transferPt);
+            const transferWalkSegment = turf.lineString([
+              transferPt.geometry.coordinates,
+              snapB.geometry.coordinates
+            ], { mode: 'transfer' });
+
+            const rideSeg2Feature = turf.feature(rideSeg2.geometry, {
+              mode: 'jeep',
+              color: e.route.properties.color
+            });
+
+            const walkToDestSegment = turf.lineString([
+              e.nearestPoint.geometry.coordinates,
+              (end as Feature<Point>).geometry.coordinates
+            ], { mode: 'walk' });
+
             bestResult = {
               type: 'transfer',
               totalDistance: Math.round(totalDistance),
               estimatedTravelTime: Math.round(travelTime),
               steps: stepsObj,
-              pathGeoJSON: turf.featureCollection([rideSeg1, rideSeg2])
+              pathGeoJSON: turf.featureCollection([
+                walkToJeepSegment,
+                rideSeg1Feature,
+                transferWalkSegment,
+                rideSeg2Feature,
+                walkToDestSegment
+              ])
             };
           }
         }

@@ -128,7 +128,20 @@ function calculateRoute() {
       console.log('[SUCCESS] Direct route found:', bestDirect.s.route.properties.route_name);
 
       const coords = bestDirect.slice.geometry.coordinates.map(c => [c[1], c[0]]);
-      L.polyline(coords, { color: '#000000', weight: 6 }).addTo(drawnLines);
+      L.polyline(coords, { color: bestDirect.s.route.properties.color || '#000000', weight: 7 }).addTo(drawnLines);
+
+      // Add walk lines for map styling
+      const startWalkCoords = [
+        [startLatLng.lat, startLatLng.lng],
+        [bestDirect.s.nearestPoint.geometry.coordinates[1], bestDirect.s.nearestPoint.geometry.coordinates[0]]
+      ];
+      const endWalkCoords = [
+        [bestDirect.e.nearestPoint.geometry.coordinates[1], bestDirect.e.nearestPoint.geometry.coordinates[0]],
+        [endLatLng.lat, endLatLng.lng]
+      ];
+
+      L.polyline(startWalkCoords, { color: '#6B7280', weight: 3, dashArray: '5, 10' }).addTo(drawnLines);
+      L.polyline(endWalkCoords, { color: '#6B7280', weight: 3, dashArray: '5, 10' }).addTo(drawnLines);
 
       resultsDiv.innerHTML = `
         <h3>Direct Route (1 Ride)</h3>
@@ -143,7 +156,8 @@ function calculateRoute() {
 
     console.log('[DEBUG] No direct route feasible, falling back to transfers...');
 
-    // B. TRANSFER ROUTE (2 RIDES)
+
+    // B. TRANSFER ROUTE (2 RIDES) using Proximity-Buffer Method
     let bestTransfer = null;
     let minTransferScore = Infinity;
 
@@ -151,39 +165,70 @@ function calculateRoute() {
       for (let e of endNearby) {
         if (s.route.properties.route_id === e.route.properties.route_id) continue;
 
-        // Use try/catch for lineIntersect parsing
-        let intersections = { features: [] };
+        // Implement Proximity-Buffer Method (50m) instead of mathematical intersection
+        let lengthA = 0;
         try {
-          intersections = turf.lineIntersect(s.route, e.route);
-        } catch (err) {
-          console.error(`[ERROR] lineIntersect failed for ${s.route.properties.route_name} and ${e.route.properties.route_name}:`, err);
+          lengthA = turf.length(s.route, { units: 'kilometers' });
+        } catch (error) {
+          continue;
         }
 
-        if (intersections.features.length > 0) {
-          console.log(`[DEBUG] Valid intersection found between ${s.route.properties.route_name} and ${e.route.properties.route_name}`);
+        let validTransferPoints = [];
+        let minPointsDistance = Infinity;
+        let bestTransferA = null;
 
-          for (let intersection of intersections.features) {
-            let slice1, slice2;
+        for (let d = 0; d <= lengthA; d += 0.1) {
+          let pt;
+          try {
+            pt = turf.along(s.route, d, { units: 'kilometers' });
+            const snapB = turf.nearestPointOnLine(e.route, pt);
+            const gap = turf.distance(pt, snapB, { units: 'kilometers' }) * 1000;
+
+            if (gap < minPointsDistance && gap <= 50) {
+              minPointsDistance = gap;
+              bestTransferA = pt;
+            }
+          } catch(err) {
+            continue;
+          }
+        }
+
+        if (bestTransferA) {
+          validTransferPoints = [bestTransferA];
+          console.log(`[DEBUG] Valid proximity transfer found between ${s.route.properties.route_name} and ${e.route.properties.route_name} (Gap: ${Math.round(minPointsDistance)}m)`);
+        }
+
+        if (validTransferPoints.length > 0) {
+          for (let transferPt of validTransferPoints) {
+            let slice1, slice2, snapB;
             try {
-              const snap1 = turf.nearestPointOnLine(s.route, intersection);
-              const snap2 = turf.nearestPointOnLine(e.route, intersection);
+              const snap1 = turf.nearestPointOnLine(s.route, transferPt);
+              snapB = turf.nearestPointOnLine(e.route, transferPt);
               slice1 = turf.lineSlice(s.nearestPoint, snap1, s.route);
-              slice2 = turf.lineSlice(snap2, e.nearestPoint, e.route);
+              slice2 = turf.lineSlice(snapB, e.nearestPoint, e.route);
             } catch(err) {
-               console.error('[ERROR] lineSlice failed on intersection transfer', err);
+               console.error('[ERROR] lineSlice failed on proximity transfer', err);
                continue;
             }
 
-            const ride1Dist = turf.length(slice1, { units: 'kilometers' }) * 1000;
-            const ride2Dist = turf.length(slice2, { units: 'kilometers' }) * 1000;
+            let ride1Dist = 0, ride2Dist = 0;
+            try {
+              ride1Dist = turf.length(slice1, { units: 'kilometers' }) * 1000;
+              ride2Dist = turf.length(slice2, { units: 'kilometers' }) * 1000;
+            } catch (e) { continue; }
 
             // Prevent backward tracking loops
             if (ride1Dist < 50 || ride2Dist < 50) continue;
 
-            const totalDist = s.distance + ride1Dist + ride2Dist + e.distance;
+            const walkTransferDist = minPointsDistance;
+            const totalDist = s.distance + ride1Dist + walkTransferDist + ride2Dist + e.distance;
+
             if (totalDist < minTransferScore) {
               minTransferScore = totalDist;
-              bestTransfer = { s, e, slice1, slice2, ride1Dist, ride2Dist, totalDist };
+              bestTransfer = {
+                s, e, slice1, slice2, ride1Dist, ride2Dist, totalDist,
+                walkTransferDist, transferPt, snapB
+              };
             }
           }
         }
@@ -195,13 +240,20 @@ function calculateRoute() {
 
       const c1 = bestTransfer.slice1.geometry.coordinates.map(c => [c[1], c[0]]);
       const c2 = bestTransfer.slice2.geometry.coordinates.map(c => [c[1], c[0]]);
-      L.polyline(c1, { color: '#000000', weight: 6 }).addTo(drawnLines);
-      L.polyline(c2, { color: '#555555', weight: 6 }).addTo(drawnLines);
+      const transferC = [
+        [bestTransfer.transferPt.geometry.coordinates[1], bestTransfer.transferPt.geometry.coordinates[0]],
+        [bestTransfer.snapB.geometry.coordinates[1], bestTransfer.snapB.geometry.coordinates[0]]
+      ];
+
+      L.polyline(c1, { color: bestTransfer.s.route.properties.color || '#000000', weight: 7 }).addTo(drawnLines);
+      L.polyline(transferC, { color: '#3B82F6', weight: 3, dashArray: '2, 5' }).addTo(drawnLines);
+      L.polyline(c2, { color: bestTransfer.e.route.properties.color || '#555555', weight: 7 }).addTo(drawnLines);
 
       resultsDiv.innerHTML = `
         <h3>Transfer Route (2 Rides)</h3>
         <div class="step">🚶 Walk ${Math.round(bestTransfer.s.distance)}m to ${bestTransfer.s.route.properties.route_name}</div>
         <div class="step" style="border-left: 4px solid ${bestTransfer.s.route.properties.color}">🚙 Ride ${Math.round(bestTransfer.ride1Dist)}m on ${bestTransfer.s.route.properties.route_name}</div>
+        ${bestTransfer.walkTransferDist > 0 ? `<div class="step" style="border-left: 4px dashed #3B82F6">🚶 Transfer Walk ${Math.round(bestTransfer.walkTransferDist)}m to ${bestTransfer.e.route.properties.route_name}</div>` : ''}
         <div class="step">🔄 Transfer to ${bestTransfer.e.route.properties.route_name}</div>
         <div class="step" style="border-left: 4px solid ${bestTransfer.e.route.properties.color}">🚙 Ride ${Math.round(bestTransfer.ride2Dist)}m on ${bestTransfer.e.route.properties.route_name}</div>
         <div class="step">🚶 Walk ${Math.round(bestTransfer.e.distance)}m to Destination</div>
