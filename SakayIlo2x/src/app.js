@@ -7,6 +7,7 @@ let drawnLines;
 
 async function init() {
   routesDB = await loadRoutes();
+  console.log('Data Loader Output:', routesDB);
 
   // 1. Initialize Map
   const map = L.map('map').setView([10.706, 122.558], 14);
