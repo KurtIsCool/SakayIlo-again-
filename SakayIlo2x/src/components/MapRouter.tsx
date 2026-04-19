@@ -3,7 +3,9 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from '
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { calculateCommute, RouteResult } from '../lib/routingEngine';
-import { iloiloRoutes } from '../data/iloiloRoutes';
+// Remove import, using fetch now
+// import { iloiloRoutes } from '../data/iloiloRoutes';
+import { loadRoutes } from '../dataLoader';
 
 // Fix typical leaflet icon issue in react
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -83,14 +85,22 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
   const [startPos, setStartPos] = useState<[number, number]>([10.722, 122.556]); // Jaro Plaza
   const [endPos, setEndPos] = useState<[number, number]>([10.6974, 122.5644]); // Plaza Libertad
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
+  const [routesData, setRoutesData] = useState<any>(null);
+
+  useEffect(() => {
+    loadRoutes().then(data => {
+      setRoutesData(data);
+    });
+  }, []);
 
   // Re-calculate route when start/end/walking distance changes
   useEffect(() => {
+    if (!routesData) return;
     // Note: routing engine expects [lat, lng]
-    const result = calculateCommute(startPos, endPos, iloiloRoutes, maxWalkingDistance);
-    setRouteResult(result);
-    onRouteResult(result);
-  }, [startPos, endPos, maxWalkingDistance, onRouteResult]);
+    const result = calculateCommute(startPos, endPos, routesData, maxWalkingDistance);
+    setRouteResult(result as RouteResult);
+    onRouteResult(result as RouteResult);
+  }, [startPos, endPos, maxWalkingDistance, routesData, onRouteResult]);
 
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom={true} className="w-full h-full rounded-xl shadow-inner z-0">
@@ -100,8 +110,8 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
       />
       
       {/* Background jeepney routes mapping */}
-      {iloiloRoutes.features.map((feature, idx) => {
-        const coords = feature.geometry.coordinates.map(c => [c[1], c[0]] as [number, number]);
+      {routesData && routesData.features.map((feature: any, idx: number) => {
+        const coords = feature.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
         return (
           <Polyline 
             key={`bg-route-${idx}`} 
@@ -116,12 +126,31 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
 
       {/* Render the computed route segments if found */}
       {routeResult && routeResult.pathGeoJSON && routeResult.pathGeoJSON.features.map((f, i) => {
-        const coords = f.geometry.coordinates.map(c => [c[1], c[0]] as [number, number]);
+        const coords = f.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
+
+        const mode = f.properties?.mode;
+        let color = '#000000';
+        let weight = 6;
+        let dashArray = undefined;
+
+        if (mode === 'walk') {
+          color = '#6B7280';
+          weight = 3;
+          dashArray = '5, 10';
+        } else if (mode === 'jeep') {
+          color = f.properties?.color || '#000000';
+          weight = 7;
+        } else if (mode === 'transfer') {
+          color = '#3B82F6';
+          weight = 3;
+          dashArray = '2, 5';
+        }
+
         return (
           <Polyline 
             key={`computed-route-${i}`} 
             positions={coords} 
-            pathOptions={{ color: '#000000', weight: 6, opacity: 0.8 }} 
+            pathOptions={{ color, weight, opacity: 0.8, dashArray }}
           />
         );
       })}
