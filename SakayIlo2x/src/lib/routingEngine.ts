@@ -73,9 +73,21 @@ function getLineSlice(
   startPt: Coord,
   endPt: Coord,
   line: Feature<LineString>
-): Feature<LineString> {
-  // turf.lineSlice creates a segment of a LineString between two points based on where they snap to the line.
-  return turf.lineSlice(startPt, endPt, line);
+): Feature<LineString> | null {
+  try {
+    const startSnapped = turf.nearestPointOnLine(line, startPt as any);
+    const endSnapped = turf.nearestPointOnLine(line, endPt as any);
+
+    // Directional validation: do not allow backward travel
+    if (startSnapped.properties.location > endSnapped.properties.location) {
+      return null;
+    }
+
+    // turf.lineSlice creates a segment of a LineString between two points based on where they snap to the line.
+    return turf.lineSlice(startSnapped, endSnapped, line);
+  } catch (error) {
+    return null;
+  }
 }
 
 /**
@@ -99,12 +111,19 @@ export function findDirectRoute(
       if (s.route.properties.id === e.route.properties.id) {
         // Direct route geometry sliced specifically for this trip
         const rideSegment = getLineSlice(s.nearestPoint, e.nearestPoint, s.route);
-        const rideDistance = turf.length(rideSegment, { units: 'kilometers' }) * 1000;
+        if (!rideSegment) continue;
+
+        let rideDistance = 0;
+        try {
+          rideDistance = turf.length(rideSegment, { units: 'kilometers' }) * 1000;
+        } catch (error) {
+          continue;
+        }
 
         const totalDistance = s.distance + rideDistance + e.distance;
         
         // Ensure that we don't pick routes where start and end snap to the exact same place (no ride at all)
-        if (rideDistance < 50) continue; 
+        if (rideDistance < 100) continue;
 
         if (totalDistance < minTotalDistance) {
           minTotalDistance = totalDistance;
@@ -168,37 +187,46 @@ export function findTransferRoutes(
     for (const e of endNearby) {
       if (s.route.properties.id === e.route.properties.id) continue; // Skip identical routes
 
-      // Find intersection points between Route A (start) and Route B (end)
-      const intersections = turf.lineIntersect(s.route as Feature<LineString>, e.route as Feature<LineString>);
-      
       let validTransferPoints: Feature<Point>[] = [];
       let walkTransferDist = 0;
 
       // Real-World GIS consideration (Iloilo Context): 
-      // Sometimes routes don't strictly intersect but come very close.
-      if (intersections.features.length > 0) {
-        validTransferPoints = intersections.features as Feature<Point>[];
-      } else {
-        // Fallback: check if routes come within walking distance
-        const lengthA = turf.length(s.route, { units: 'kilometers' });
-        let minPointsDistance = Infinity;
-        let bestTransferA: Feature<Point> | null = null;
-        
-        // Sample every 500 meters
-        for (let d = 0; d <= lengthA; d += 0.5) {
-          const pt = turf.along(s.route as Feature<LineString>, d, { units: 'kilometers' });
+      // Replace mathematically brittle lineIntersect with Proximity-Based Transfers
+      let lengthA = 0;
+      try {
+        lengthA = turf.length(s.route, { units: 'kilometers' });
+      } catch (error) {
+        continue;
+      }
+
+      let minPointsDistance = Infinity;
+      let bestTransferA: Feature<Point> | null = null;
+
+      // Sample every 100 meters (0.1 km) for better precision in finding <50m proximity
+      for (let d = 0; d <= lengthA; d += 0.1) {
+        let pt: Feature<Point>;
+        try {
+          pt = turf.along(s.route as Feature<LineString>, d, { units: 'kilometers' });
+        } catch(e) {
+          continue; // skip this sample if it fails
+        }
+
+        try {
           const snapB = turf.nearestPointOnLine(e.route as Feature<LineString>, pt);
           const gap = turf.distance(pt, snapB, { units: 'kilometers' }) * 1000;
-          if (gap < minPointsDistance) {
+          // Check if it's the best gap, and if it's within the 50 meters proximity rule
+          if (gap < minPointsDistance && gap <= 50) {
             minPointsDistance = gap;
             bestTransferA = pt;
           }
+        } catch(e) {
+          continue;
         }
-        
-        if (minPointsDistance <= maxWalkingDistance && bestTransferA) {
-          validTransferPoints = [bestTransferA];
-          walkTransferDist = minPointsDistance;
-        }
+      }
+
+      if (bestTransferA) {
+        validTransferPoints = [bestTransferA];
+        walkTransferDist = minPointsDistance;
       }
       
       if (validTransferPoints.length > 0) {
@@ -206,18 +234,26 @@ export function findTransferRoutes(
         for (const transferPt of validTransferPoints) {
 
           const rideSeg1 = getLineSlice(s.nearestPoint, transferPt, s.route);
-          const ride1Dist = turf.length(rideSeg1, { units: 'kilometers' }) * 1000;
-          
           const rideSeg2 = getLineSlice(transferPt, e.nearestPoint, e.route);
-          const ride2Dist = turf.length(rideSeg2, { units: 'kilometers' }) * 1000;
+
+          if (!rideSeg1 || !rideSeg2) continue;
+
+          let ride1Dist = 0;
+          let ride2Dist = 0;
+          try {
+            ride1Dist = turf.length(rideSeg1, { units: 'kilometers' }) * 1000;
+            ride2Dist = turf.length(rideSeg2, { units: 'kilometers' }) * 1000;
+          } catch (error) {
+            continue;
+          }
 
           // Validate that the trip is logical and doesn't back-track endlessly
-          if (ride1Dist < 50 || ride2Dist < 50) continue;
+          if (ride1Dist < 100 || ride2Dist < 100) continue;
 
           const totalDistance = s.distance + ride1Dist + walkTransferDist + ride2Dist + e.distance;
           
-          // Heuristic score: penalize transfers (e.g. + 500m perceived weight)
-          const score = totalDistance + 500;
+          // Heuristic score: penalize transfers (e.g. + 1000m perceived weight)
+          const score = totalDistance + 1000;
 
           if (score < minScore) {
             minScore = score;
@@ -297,23 +333,28 @@ export function calculateCommute(
   endLatLng: [number, number],
   routes: FeatureCollection<LineString>,
   maxWalkingDistance: number = 800
-): RouteResult | null {
-  // Convert basic lat/lng to Turf Point features.
-  // Note: Turf uses [longitude, latitude] internally
-  const startPt = turf.point([startLatLng[1], startLatLng[0]]);
-  const endPt = turf.point([endLatLng[1], endLatLng[0]]);
+): RouteResult | { error: string } | null {
+  try {
+    // Convert basic lat/lng to Turf Point features.
+    // Note: Turf uses [longitude, latitude] internally
+    const startPt = turf.point([startLatLng[1], startLatLng[0]]);
+    const endPt = turf.point([endLatLng[1], endLatLng[0]]);
 
-  // 1. Prioritize Direct Route (Highest Priority)
-  const directRoute = findDirectRoute(startPt, endPt, routes, maxWalkingDistance);
-  if (directRoute) {
-    return directRoute;
+    // 1. Prioritize Direct Route (Highest Priority)
+    const directRoute = findDirectRoute(startPt, endPt, routes, maxWalkingDistance);
+    if (directRoute) {
+      return directRoute;
+    }
+
+    // 2. Fallback to Transfer Route (Max 2 rides)
+    const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);
+    if (transferRoute) {
+      return transferRoute;
+    }
+
+    return null;
+  } catch (error) {
+    // Catch-all for malformed GeoJSON or unpredictable Turf.js crashes
+    return { error: "No route found" };
   }
-
-  // 2. Fallback to Transfer Route (Max 2 rides)
-  const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);
-  if (transferRoute) {
-    return transferRoute;
-  }
-
-  return null;
 }
