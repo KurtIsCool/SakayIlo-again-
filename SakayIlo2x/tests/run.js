@@ -1,3 +1,6 @@
+import './test_override.js';
+
+// The app initialization is async now. We need to wait for it.
 import * as turf from '@turf/turf';
 
 // Store results and markers
@@ -53,6 +56,9 @@ async function runTests() {
   console.log("Loading app.js...");
   await import('../src/app.js');
 
+  // Need to wait briefly because the app.init() is an async IIFE or similar now
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   if (markers.length < 2) {
     console.error("Markers not initialized");
     return;
@@ -64,7 +70,6 @@ async function runTests() {
   const testScenarios = [
     {
       name: "Test 1: The 'Perfect 1-Ride'",
-      // On Jaro Liko NFA route -> Jaro CPU
       start: [10.7300, 122.5539],
       end: [10.6974, 122.5644],
       expectPattern: /Direct Route \(1 Ride\)|Transfer Route/i
@@ -77,14 +82,12 @@ async function runTests() {
     },
     {
       name: "Test 3: The 'Too Far to Walk'",
-      // Middle of the ocean
       start: [0, 0],
       end: [1, 1],
       expectPattern: /No route found/i
     },
     {
       name: "Test 4: The 'Same Start and End'",
-      // Exact same coordinates
       start: [10.7300, 122.5539],
       end: [10.7300, 122.5539],
       expectPattern: /Walk .* Destination|Direct Route|No route found/i
@@ -101,14 +104,11 @@ async function runTests() {
     const t = testScenarios[i];
     console.log(`Running ${t.name}...`);
 
-    // Set coordinates (Leaflet takes [lat, lng])
     startMarker.setLatLng(t.start);
     endMarker.setLatLng(t.end);
 
-    // Clear previous results
     results.innerHTML = '';
 
-    // Trigger calculation
     try {
       startMarker.triggerDragend();
 
