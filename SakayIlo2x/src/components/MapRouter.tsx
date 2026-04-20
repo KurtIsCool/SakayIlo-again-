@@ -45,6 +45,8 @@ export default function MapRouter() {
   const [isLoading, setIsLoading] = useState(false);
   const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
   const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
+  const [originText, setOriginText] = useState('');
+  const [destText, setDestText] = useState('');
 
   useEffect(() => {
     loadRoutes().then(data => {
@@ -52,19 +54,22 @@ export default function MapRouter() {
     });
   }, []);
 
-  const handleCalculateRoute = (origin: [number, number], dest: [number, number]) => {
+  const handleCalculateRoute = () => {
+    if (!originCoords || !destCoords) {
+      alert("Please select both locations.");
+      return;
+    }
+
     if (!routesData) {
       alert("Routes data is still loading, please try again in a moment.");
       return;
     }
 
     setIsLoading(true);
-    setOriginCoords(origin);
-    setDestCoords(dest);
 
     try {
       const maxWalkingDistance = 800; // default for now
-      const results = calculateCommute(origin, dest, routesData, maxWalkingDistance);
+      const results = calculateCommute(originCoords, destCoords, routesData, maxWalkingDistance);
 
       if (Array.isArray(results) && results.length > 0) {
         setRouteOptions(results as RouteResult[]);
@@ -88,6 +93,10 @@ export default function MapRouter() {
   const handleClear = () => {
     setRouteOptions([]);
     setSelectedRoute(null);
+    setOriginCoords(null);
+    setDestCoords(null);
+    setOriginText('');
+    setDestText('');
   };
 
   return (
@@ -150,6 +159,14 @@ export default function MapRouter() {
       {/* Foreground UI Layer */}
       <div className="absolute top-0 left-0 w-full md:w-[28rem] h-full pointer-events-none z-10 flex flex-col p-4 md:p-6 gap-4">
         <SearchBottomSheet
+          originText={originText}
+          destText={destText}
+          setOriginText={setOriginText}
+          setDestText={setDestText}
+          originCoords={originCoords}
+          destCoords={destCoords}
+          setOriginCoords={setOriginCoords}
+          setDestCoords={setDestCoords}
           onCalculateRoute={handleCalculateRoute}
           isLoading={isLoading}
         />
