@@ -81,8 +81,8 @@ export default function MapRouter({ selectedRoute, originCoords, destCoords }: M
         let dashArray = undefined;
 
         if (mode === 'walk') {
-          color = '#6B7280';
-          weight = 3;
+          color = '#9ca3af';
+          weight = 4;
           dashArray = '5, 10';
         } else if (mode === 'jeep') {
           color = f.properties?.color || '#000000';
