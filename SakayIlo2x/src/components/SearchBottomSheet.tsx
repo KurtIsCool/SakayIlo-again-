@@ -10,8 +10,21 @@ export interface RouteResult {
   description: string;
 }
 
+const fetchAddress = async (lat: number, lng: number): Promise<string> => {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    const data = await res.json();
+    if (data.address) {
+      return data.address.road || data.address.neighbourhood || (data.display_name && data.display_name.split(',')[0]) || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+    }
+    return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+  } catch (err) {
+    return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+  }
+};
+
 export interface SearchBottomSheetProps {
-  onSearch?: (originCoords: [number, number], destCoords: [number, number]) => void;
+  onCalculateRoute?: (origin: [number, number], dest: [number, number]) => void;
   isLoading?: boolean;
   results?: RouteResult[] | null;
   onLocateOrigin?: (setCoords: (coords: [number, number]) => void) => void;
@@ -20,7 +33,7 @@ export interface SearchBottomSheetProps {
 }
 
 const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
-  onSearch,
+  onCalculateRoute,
   isLoading: externalIsLoading = false,
   results = null,
   onLocateOrigin,
@@ -48,10 +61,11 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
         setOriginCoords([latitude, longitude]);
-        setOriginText('Current Location');
+        const addr = await fetchAddress(latitude, longitude);
+        setOriginText(addr);
         setIsLocating(false);
       },
       (error) => {
@@ -62,23 +76,16 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   };
 
   const handleSearch = () => {
-    setLocalIsLoading(true);
-
     // Validate that both origin and destination coordinates are available
     if (!originCoords || !destCoords) {
-      alert("Please select both origin and destination coordinates first.");
-      setLocalIsLoading(false);
+      alert("Please select both locations.");
       return;
     }
 
-    if (onSearch) {
-      // -------------------------------------------------------------------------------------------------
-      // !!! PLUG IN ENGINE HERE !!!
-      // You should execute your calculateCommute engine function inside the onSearch callback provided
-      // by the parent component (e.g., App.tsx). Pass the validated originCoords and destCoords below.
-      // E.g., `const result = calculateCommute(originCoords, destCoords, routesData, 800);`
-      // -------------------------------------------------------------------------------------------------
-      onSearch(originCoords, destCoords);
+    setLocalIsLoading(true);
+
+    if (onCalculateRoute) {
+      onCalculateRoute(originCoords, destCoords);
     }
 
     setLocalIsLoading(false);
@@ -218,15 +225,16 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
             {/* Modal Footer / Confirm Button */}
             <div className="p-6 bg-white border-t-2 border-gray-100 z-10">
               <button
-                onClick={() => {
+                onClick={async () => {
                   const finalCoords = tempMarkerPos || (activeMapPicker === 'origin' ? originCoords : destCoords) || [10.722, 122.556];
+                  const addr = await fetchAddress(finalCoords[0], finalCoords[1]);
 
                   if (activeMapPicker === 'origin') {
                     setOriginCoords(finalCoords);
-                    setOriginText('Map Location'); // You could reverse geocode this later
+                    setOriginText(addr);
                   } else {
                     setDestCoords(finalCoords);
-                    setDestinationText('Map Location');
+                    setDestinationText(addr);
                   }
                   setActiveMapPicker(null);
                   setTempMarkerPos(null);
