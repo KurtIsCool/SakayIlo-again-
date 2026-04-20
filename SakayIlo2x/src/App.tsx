@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import MapRouter from './components/MapRouter';
 import SearchBottomSheet, { RouteResult } from './components/SearchBottomSheet';
-import { RouteResult as EngineRouteResult } from './lib/routingEngine';
+import { RouteResult as EngineRouteResult, calculateCommute } from './lib/routingEngine';
+import { loadRoutes } from './dataLoader';
 
 const App: React.FC = () => {
   const [routeResult, setRouteResult] = useState<EngineRouteResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [routesData, setRoutesData] = useState<any>(null);
+
+  useEffect(() => {
+    loadRoutes().then(data => {
+      setRoutesData(data);
+    });
+  }, []);
 
   // Map routing engine result to the UI component result format
   const mappedResults: RouteResult[] | null = routeResult && !('error' in routeResult) ? [
@@ -21,14 +30,24 @@ const App: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleSearch = (originCoords: [number, number], destCoords: [number, number]) => {
+  const handleCalculateRoute = (originCoords: [number, number], destCoords: [number, number]) => {
+    if (!routesData) {
+      alert("Routes data is still loading, please try again in a moment.");
+      return;
+    }
+
     setIsLoading(true);
-    // Real map markers update would happen here based on search strings
-    // For now, MapRouter uses its internal state and draggable markers.
-    // We simulate a loading state before results appear.
-    setTimeout(() => {
+
+    try {
+      const maxWalkingDistance = 800; // or get from some state
+      const result = calculateCommute(originCoords, destCoords, routesData, maxWalkingDistance);
+      setRouteResult(result as EngineRouteResult);
+    } catch (e) {
+      console.error(e);
+      setRouteResult({ error: "Failed to calculate route" } as any);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -42,7 +61,7 @@ const App: React.FC = () => {
       <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-8 md:p-6 md:pb-10 pointer-events-none">
         <div className="pointer-events-auto w-full max-w-md mx-auto">
           <SearchBottomSheet
-            onSearch={handleSearch}
+            onCalculateRoute={handleCalculateRoute}
             isLoading={isLoading}
             results={mappedResults}
             onLocateOrigin={(setCoords) => {
