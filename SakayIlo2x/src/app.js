@@ -1,5 +1,15 @@
 import { loadRoutes } from './dataLoader.js';
 
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 let routesDB;
 let startMarker;
 let endMarker;
@@ -145,8 +155,8 @@ function calculateRoute() {
 
       resultsDiv.innerHTML = `
         <h3>Direct Route (1 Ride)</h3>
-        <div class="step">🚶 Walk ${Math.round(bestDirect.s.distance)}m to ${bestDirect.s.route.properties.route_name}</div>
-        <div class="step" style="border-left: 4px solid ${bestDirect.s.route.properties.color}">🚙 Ride ${Math.round(bestDirect.rideDist)}m on ${bestDirect.s.route.properties.route_name}</div>
+        <div class="step">🚶 Walk ${Math.round(bestDirect.s.distance)}m to ${escapeHTML(bestDirect.s.route.properties.route_name)}</div>
+        <div class="step" style="border-left: 4px solid ${escapeHTML(bestDirect.s.route.properties.color)}">🚙 Ride ${Math.round(bestDirect.rideDist)}m on ${escapeHTML(bestDirect.s.route.properties.route_name)}</div>
         <div class="step">🚶 Walk ${Math.round(bestDirect.e.distance)}m to Destination</div>
         <p><strong>Total Distance: ${Math.round(bestDirect.totalDist)}m</strong></p>
       `;
@@ -251,11 +261,11 @@ function calculateRoute() {
 
       resultsDiv.innerHTML = `
         <h3>Transfer Route (2 Rides)</h3>
-        <div class="step">🚶 Walk ${Math.round(bestTransfer.s.distance)}m to ${bestTransfer.s.route.properties.route_name}</div>
-        <div class="step" style="border-left: 4px solid ${bestTransfer.s.route.properties.color}">🚙 Ride ${Math.round(bestTransfer.ride1Dist)}m on ${bestTransfer.s.route.properties.route_name}</div>
-        ${bestTransfer.walkTransferDist > 0 ? `<div class="step" style="border-left: 4px dashed #3B82F6">🚶 Transfer Walk ${Math.round(bestTransfer.walkTransferDist)}m to ${bestTransfer.e.route.properties.route_name}</div>` : ''}
-        <div class="step">🔄 Transfer to ${bestTransfer.e.route.properties.route_name}</div>
-        <div class="step" style="border-left: 4px solid ${bestTransfer.e.route.properties.color}">🚙 Ride ${Math.round(bestTransfer.ride2Dist)}m on ${bestTransfer.e.route.properties.route_name}</div>
+        <div class="step">🚶 Walk ${Math.round(bestTransfer.s.distance)}m to ${escapeHTML(bestTransfer.s.route.properties.route_name)}</div>
+        <div class="step" style="border-left: 4px solid ${escapeHTML(bestTransfer.s.route.properties.color)}">🚙 Ride ${Math.round(bestTransfer.ride1Dist)}m on ${escapeHTML(bestTransfer.s.route.properties.route_name)}</div>
+        ${bestTransfer.walkTransferDist > 0 ? `<div class="step" style="border-left: 4px dashed #3B82F6">🚶 Transfer Walk ${Math.round(bestTransfer.walkTransferDist)}m to ${escapeHTML(bestTransfer.e.route.properties.route_name)}</div>` : ''}
+        <div class="step">🔄 Transfer to ${escapeHTML(bestTransfer.e.route.properties.route_name)}</div>
+        <div class="step" style="border-left: 4px solid ${escapeHTML(bestTransfer.e.route.properties.color)}">🚙 Ride ${Math.round(bestTransfer.ride2Dist)}m on ${escapeHTML(bestTransfer.e.route.properties.route_name)}</div>
         <div class="step">🚶 Walk ${Math.round(bestTransfer.e.distance)}m to Destination</div>
         <p><strong>Total Distance: ${Math.round(bestTransfer.totalDist)}m</strong></p>
       `;
@@ -269,7 +279,7 @@ function calculateRoute() {
 
   } catch (err) {
     console.error('CRITICAL ENGINE ABORT in calculateRoute:', err);
-    resultsDiv.innerHTML = `<p style="color:red;">Error calculating route: ${err.message}</p>`;
+    resultsDiv.innerHTML = `<p style="color:red;">Error calculating route: ${escapeHTML(err.message)}</p>`;
   }
 }
 
