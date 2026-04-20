@@ -16,25 +16,33 @@ const fetchAddress = async (lat: number, lng: number): Promise<string> => {
 };
 
 export interface SearchBottomSheetProps {
-  onCalculateRoute?: (origin: [number, number], dest: [number, number]) => void;
+  originText: string;
+  destText: string;
+  setOriginText: (text: string) => void;
+  setDestText: (text: string) => void;
+  originCoords: [number, number] | null;
+  destCoords: [number, number] | null;
+  setOriginCoords: (coords: [number, number] | null) => void;
+  setDestCoords: (coords: [number, number] | null) => void;
+  onCalculateRoute?: () => void;
   isLoading?: boolean;
 }
 
 const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
+  originText,
+  destText,
+  setOriginText,
+  setDestText,
+  originCoords,
+  destCoords,
+  setOriginCoords,
+  setDestCoords,
   onCalculateRoute,
-  isLoading: externalIsLoading = false,
+  isLoading = false,
 }) => {
-  const [originText, setOriginText] = useState('');
-  const [destinationText, setDestinationText] = useState('');
-  const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
-  const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
-  const [localIsLoading, setLocalIsLoading] = useState(false);
-
   const [isLocating, setIsLocating] = useState(false);
   const [activeMapPicker, setActiveMapPicker] = useState<'origin' | 'destination' | null>(null);
   const [tempMarkerPos, setTempMarkerPos] = useState<[number, number] | null>(null);
-
-  const isLoading = externalIsLoading || localIsLoading;
 
   const handleGeolocation = () => {
     setIsLocating(true);
@@ -60,19 +68,9 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   };
 
   const handleSearch = () => {
-    // Validate that both origin and destination coordinates are available
-    if (!originCoords || !destCoords) {
-      alert("Please select both locations.");
-      return;
-    }
-
-    setLocalIsLoading(true);
-
     if (onCalculateRoute) {
-      onCalculateRoute(originCoords, destCoords);
+      onCalculateRoute();
     }
-
-    setLocalIsLoading(false);
   };
 
   return (
@@ -123,8 +121,8 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
               type="text"
               className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-12 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
               placeholder="Enter destination"
-              value={destinationText}
-              onChange={(e) => setDestinationText(e.target.value)}
+              value={destText}
+              onChange={(e) => setDestText(e.target.value)}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
               <button
@@ -205,7 +203,7 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
                     setOriginText(addr);
                   } else {
                     setDestCoords(finalCoords);
-                    setDestinationText(addr);
+                    setDestText(addr);
                   }
                   setActiveMapPicker(null);
                   setTempMarkerPos(null);
