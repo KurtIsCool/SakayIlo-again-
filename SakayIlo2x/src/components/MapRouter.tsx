@@ -94,13 +94,13 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
   }, []);
 
   // Re-calculate route when start/end/walking distance changes
-  useEffect(() => {
-    if (!routesData) return;
-    // Note: routing engine expects [lat, lng]
-    const result = calculateCommute(startPos, endPos, routesData, maxWalkingDistance);
-    setRouteResult(result as RouteResult);
-    onRouteResult(result as RouteResult);
-  }, [startPos, endPos, maxWalkingDistance, routesData, onRouteResult]);
+  // useEffect(() => {
+  //   if (!routesData) return;
+  //   // Note: routing engine expects [lat, lng]
+  //   const result = calculateCommute(startPos, endPos, routesData, maxWalkingDistance);
+  //   setRouteResult(result as RouteResult);
+  //   onRouteResult(result as RouteResult);
+  // }, [startPos, endPos, maxWalkingDistance, routesData, onRouteResult]);
 
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom={true} className="w-full h-full rounded-xl shadow-inner z-0">

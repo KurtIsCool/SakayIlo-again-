@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Crosshair, MapPin, Loader2 } from 'lucide-react';
+import { Crosshair } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export interface RouteResult {
   id: string;
@@ -8,29 +10,51 @@ export interface RouteResult {
 }
 
 export interface SearchBottomSheetProps {
-  onSearch?: (origin: string, destination: string) => void;
+  onSearch?: (originCoords: [number, number], destCoords: [number, number]) => void;
   isLoading?: boolean;
   results?: RouteResult[] | null;
-  onLocateOrigin?: () => void;
-  onPinOrigin?: () => void;
-  onPinDestination?: () => void;
+  onLocateOrigin?: (setCoords: (coords: [number, number]) => void) => void;
+  onPinOrigin?: (setCoords: (coords: [number, number]) => void) => void;
+  onPinDestination?: (setCoords: (coords: [number, number]) => void) => void;
 }
 
 const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   onSearch,
-  isLoading = false,
+  isLoading: externalIsLoading = false,
   results = null,
   onLocateOrigin,
   onPinOrigin,
   onPinDestination,
 }) => {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
+  const [originText, setOriginText] = useState('');
+  const [destinationText, setDestinationText] = useState('');
+  const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
+  const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
+  const [localIsLoading, setLocalIsLoading] = useState(false);
+
+  const isLoading = externalIsLoading || localIsLoading;
 
   const handleSearch = () => {
-    if (onSearch) {
-      onSearch(origin, destination);
+    setLocalIsLoading(true);
+
+    // Validate that both origin and destination coordinates are available
+    if (!originCoords || !destCoords) {
+      alert("Please select both origin and destination coordinates first.");
+      setLocalIsLoading(false);
+      return;
     }
+
+    if (onSearch) {
+      // -------------------------------------------------------------------------------------------------
+      // !!! PLUG IN ENGINE HERE !!!
+      // You should execute your calculateCommute engine function inside the onSearch callback provided
+      // by the parent component (e.g., App.tsx). Pass the validated originCoords and destCoords below.
+      // E.g., `const result = calculateCommute(originCoords, destCoords, routesData, 800);`
+      // -------------------------------------------------------------------------------------------------
+      onSearch(originCoords, destCoords);
+    }
+
+    setLocalIsLoading(false);
   };
 
   return (
@@ -45,19 +69,19 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
             type="text"
             className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-20 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
             placeholder="Enter origin"
-            value={origin}
-            onChange={(e) => setOrigin(e.target.value)}
+            value={originText}
+            onChange={(e) => setOriginText(e.target.value)}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button
-              onClick={onLocateOrigin}
+              onClick={() => onLocateOrigin && onLocateOrigin(setOriginCoords)}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Use my location"
             >
               <Crosshair size={20} strokeWidth={2.5} />
             </button>
             <button
-              onClick={onPinOrigin}
+              onClick={() => onPinOrigin && onPinOrigin(setOriginCoords)}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Choose on map"
             >
@@ -75,12 +99,12 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
             type="text"
             className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-12 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
             placeholder="Enter destination"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
+            value={destinationText}
+            onChange={(e) => setDestinationText(e.target.value)}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
             <button
-              onClick={onPinDestination}
+              onClick={() => onPinDestination && onPinDestination(setDestCoords)}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Choose on map"
             >

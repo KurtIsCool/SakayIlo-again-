@@ -21,7 +21,7 @@ const App: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleSearch = (origin: string, destination: string) => {
+  const handleSearch = (originCoords: [number, number], destCoords: [number, number]) => {
     setIsLoading(true);
     // Real map markers update would happen here based on search strings
     // For now, MapRouter uses its internal state and draggable markers.
@@ -45,9 +45,18 @@ const App: React.FC = () => {
             onSearch={handleSearch}
             isLoading={isLoading}
             results={mappedResults}
-            onLocateOrigin={() => console.log('Locate origin')}
-            onPinOrigin={() => console.log('Pin origin')}
-            onPinDestination={() => console.log('Pin destination')}
+            onLocateOrigin={(setCoords) => {
+              console.log('Locate origin');
+              setCoords([10.706, 122.558]);
+            }}
+            onPinOrigin={(setCoords) => {
+              console.log('Pin origin');
+              setCoords([10.722, 122.556]);
+            }}
+            onPinDestination={(setCoords) => {
+              console.log('Pin destination');
+              setCoords([10.6974, 122.5644]);
+            }}
           />
         </div>
       </div>
