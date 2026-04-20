@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Crosshair } from 'lucide-react';
 import { MapPin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import LocationPickerMap from './LocationPickerMap';
 
 export interface RouteResult {
   id: string;
@@ -34,6 +35,7 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
 
   const [isLocating, setIsLocating] = useState(false);
   const [activeMapPicker, setActiveMapPicker] = useState<'origin' | 'destination' | null>(null);
+  const [tempMarkerPos, setTempMarkerPos] = useState<[number, number] | null>(null);
 
   const isLoading = externalIsLoading || localIsLoading;
 
@@ -191,7 +193,10 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
                 {activeMapPicker === 'origin' ? 'Select Origin on Map' : 'Select Destination on Map'}
               </h3>
               <button
-                onClick={() => setActiveMapPicker(null)}
+                onClick={() => {
+                  setActiveMapPicker(null);
+                  setTempMarkerPos(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 font-bold p-2"
               >
                 Cancel
@@ -199,28 +204,32 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
             </div>
 
             {/* Map Placeholder */}
-            <div className="flex-1 bg-gray-100 relative">
-              {/* Future Leaflet Component Injection Here */}
-              <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-bold">
-                Map goes here
-              </div>
+            <div className="flex-1 bg-gray-100 relative z-0">
+              <LocationPickerMap
+                initialPosition={
+                  activeMapPicker === 'origin'
+                    ? (originCoords || [10.722, 122.556])
+                    : (destCoords || [10.722, 122.556])
+                }
+                onPositionChange={(lat, lng) => setTempMarkerPos([lat, lng])}
+              />
             </div>
 
             {/* Modal Footer / Confirm Button */}
-            <div className="p-6 bg-white border-t-2 border-gray-100">
+            <div className="p-6 bg-white border-t-2 border-gray-100 z-10">
               <button
                 onClick={() => {
-                  // Simulate confirming location, for now just sets a dummy location.
-                  // Real integration will fetch actual map center coordinates.
-                  const dummyCoords: [number, number] = [10.706, 122.558]; // Iloilo dummy default
+                  const finalCoords = tempMarkerPos || (activeMapPicker === 'origin' ? originCoords : destCoords) || [10.722, 122.556];
+
                   if (activeMapPicker === 'origin') {
-                    setOriginCoords(dummyCoords);
+                    setOriginCoords(finalCoords);
                     setOriginText('Map Location'); // You could reverse geocode this later
                   } else {
-                    setDestCoords(dummyCoords);
+                    setDestCoords(finalCoords);
                     setDestinationText('Map Location');
                   }
                   setActiveMapPicker(null);
+                  setTempMarkerPos(null);
                 }}
                 className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 rounded-2xl font-extrabold text-white text-lg border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition-all"
               >
