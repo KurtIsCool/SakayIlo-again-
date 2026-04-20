@@ -2,16 +2,16 @@ import fs from 'fs';
 import path from 'path';
 
 export const routeFiles = [
-  "ROUTE  # 1 BO. OBRERO, LAPUZ TO CITY PROPER LOOP.geojson",
-  "ROUTE # 11 LA PAZ – ILOILO CITY PROPER VIA ISATU2.geojson",
-  "ROUTE # 15A (LIKO) MOLO – ILOILO CITY PROPER VIA BALUARTE LOOP JEEPNEY ROUTE2.geojson",
-  "ROUTE # 15B (DERECHO) MOLO – ILOILO CITY PROPER VIA BALUARTE LOOP JEEPNEY ROUTE2.geojson",
-  "ROUTE # 2 CALAPARAN CALUMPANG – ILOILO CITY PROPER2.geojson",
-  "ROUTE # 3 UNGKA – ILOILO CITY PROPER VIA CPU2.geojson",
-  "ROUTE # 4 UNGKA-ILOILO CITY VIA DIVERSION FESTIVE WALK TRANSPORT HUB LOOP2.geojson",
-  "ROUTE # 5 FESTIVE WALK TRANSPORT HUB ILOILO CITY PROPER VIA SM CITY2.geojson",
-  "ROUTE # 7 COMPANIA – ILOILO CITY PROPER LOOP2.geojson",
-  "ROUTE # 9 MOHON – INFANTE LOOP2.geojson"
+  "route_11_la_paz_iloilo_city_proper_via_isatu2.geojson",
+  "route_15a_liko_molo_iloilo_city_proper_via_baluarte_loop_jeepney_route2.geojson",
+  "route_15b_derecho_molo_iloilo_city_proper_via_baluarte_loop_jeepney_route2.geojson",
+  "route_1_bo._obrero_lapuz_to_city_proper_loop.geojson",
+  "route_2_calaparan_calumpang_iloilo_city_proper2.geojson",
+  "route_3_ungka_iloilo_city_proper_via_cpu2.geojson",
+  "route_4_ungka_iloilo_city_via_diversion_festive_walk_transport_hub_loop2.geojson",
+  "route_5_festive_walk_transport_hub_iloilo_city_proper_via_sm_city2.geojson",
+  "route_7_compania_iloilo_city_proper_loop2.geojson",
+  "route_9_mohon_infante_loop2.geojson"
 ];
 
 const colors = [
@@ -20,8 +20,12 @@ const colors = [
 ];
 
 function sanitizeName(filename) {
-  let name = filename.replace('.geojson', '');
-  name = name.replace(/ROUTE\s*#\s*\w+\s*/i, '');
+  let name = filename.replace(/\.geojson$/i, '');
+  name = name.replace(/^route_([0-9]+[a-zA-Z]?)_/i, '');
+  name = name.replace(/_iloilo_city_proper/i, ' - City Proper');
+  name = name.replace(/_city_proper/i, ' - City Proper');
+  name = name.replace(/_/g, ' ');
+  name = name.replace(/\b\w/g, char => char.toUpperCase());
   return name.trim();
 }
 
@@ -32,7 +36,7 @@ export async function loadRoutes() {
     const file = routeFiles[i];
     try {
       // In tests, read from disk synchronously
-      const filePath = path.join(process.cwd(), 'src/data', file);
+      const filePath = path.join(process.cwd(), 'public/data', file);
       const data = fs.readFileSync(filePath, 'utf8');
       const geojson = JSON.parse(data);
 
