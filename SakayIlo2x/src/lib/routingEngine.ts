@@ -261,41 +261,68 @@ function findCoincidentTransfer(
   routeB: Feature<LineString>,
   maxGapMeters: number = 50
 ): { point: Feature<Point>; gapMeters: number } | null {
-  let lengthA = 0;
   try {
-    lengthA = turf.length(routeA, { units: 'kilometers' });
+    const bboxA = turf.bbox(routeA);
+    const bboxB = turf.bbox(routeB);
+
+    // 1 degree of latitude is approximately 111km.
+    // Expand bounding box slightly to account for the maxGapMeters.
+    // e.g., 50m / 111,000m ≈ 0.00045 degrees.
+    const expandDeg = (maxGapMeters / 111000) * 1.5;
+
+    // Fast BBox intersection check to avoid O(N * M) bottleneck
+    const bboxOverlap = !(
+      bboxA[0] > bboxB[2] + expandDeg ||
+      bboxA[2] < bboxB[0] - expandDeg ||
+      bboxA[1] > bboxB[3] + expandDeg ||
+      bboxA[3] < bboxB[1] - expandDeg
+    );
+
+    if (!bboxOverlap) return null;
+
+    // 1. Try strict intersection first
+    const intersections = turf.lineIntersect(routeA, routeB);
+    if (intersections.features.length > 0) {
+      // Return the first mathematically valid intersection node snapped to Route A
+      const intersectPt = intersections.features[0];
+      const snappedA = turf.nearestPointOnLine(routeA, intersectPt);
+      return { point: snappedA, gapMeters: 0 };
+    }
+
+    // 2. Fallback: check vertex proximity for routes that run parallel but never strictly intersect
+    let minPointsDistance = Infinity;
+    let bestTransferA: Feature<Point> | null = null;
+
+    const coordsA = turf.getCoords(routeA);
+    // Iterate over vertices instead of sampling every 100m
+    for (const coord of coordsA) {
+      // Only check vertices that are within Route B's expanded bounding box
+      if (
+        coord[0] >= bboxB[0] - expandDeg &&
+        coord[0] <= bboxB[2] + expandDeg &&
+        coord[1] >= bboxB[1] - expandDeg &&
+        coord[1] <= bboxB[3] + expandDeg
+      ) {
+        const pt = turf.point(coord as [number, number]);
+        const snapB = turf.nearestPointOnLine(routeB, pt);
+        const gap = turf.distance(pt, snapB, { units: 'kilometers' }) * 1000;
+
+        if (gap < minPointsDistance && gap <= maxGapMeters) {
+          minPointsDistance = gap;
+          // Return the actual vertex node from Route A
+          bestTransferA = pt;
+        }
+      }
+    }
+
+    if (bestTransferA) {
+      return { point: bestTransferA, gapMeters: minPointsDistance };
+    }
+
   } catch (error) {
     return null;
   }
 
-  let minPointsDistance = Infinity;
-  let bestTransferA: Feature<Point> | null = null;
-
-  // Sample every 100 meters (0.1 km) for better precision in finding proximity
-  for (let d = 0; d <= lengthA; d += 0.1) {
-    let pt: Feature<Point>;
-    try {
-      pt = turf.along(routeA, d, { units: 'kilometers' });
-    } catch(e) {
-      continue; // skip this sample if it fails
-    }
-
-    try {
-      const snapB = turf.nearestPointOnLine(routeB, pt);
-      const gap = turf.distance(pt, snapB, { units: 'kilometers' }) * 1000;
-      // Check if it's the best gap, and if it's within the proximity rule
-      if (gap < minPointsDistance && gap <= maxGapMeters) {
-        minPointsDistance = gap;
-        bestTransferA = pt;
-      }
-    } catch(e) {
-      continue;
-    }
-  }
-
-  if (bestTransferA) {
-    return { point: bestTransferA, gapMeters: minPointsDistance };
-  }
   return null;
 }
 
