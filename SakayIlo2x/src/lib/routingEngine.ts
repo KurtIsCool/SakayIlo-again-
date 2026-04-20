@@ -90,39 +90,32 @@ function getShortestLoopSlice(
   const locStart = startSnapped.properties?.location || 0;
   const locEnd = endSnapped.properties?.location || 0;
 
-  const innerSlice = turf.lineSlice(startSnapped, endSnapped, line);
-  const innerDist = turf.length(innerSlice, { units: 'kilometers' });
-
-  const totalLength = turf.length(line, { units: 'kilometers' });
-  const wrapAroundDist = totalLength - innerDist;
-
-  if (innerDist <= wrapAroundDist) {
-    const coords = innerSlice.geometry.coordinates;
-    if (locStart > locEnd) {
-      coords.reverse();
-    }
-    return turf.lineString(coords);
+  // V1 Enterprise Refactor: Stop using array percentages and .reverse()
+  // If the destination is physically ahead of the user (standard forward travel)
+  if (locStart <= locEnd) {
+    return turf.lineSlice(startSnapped, endSnapped, line);
   } else {
+    // Topological Teleportation Fix:
+    // If destination is behind the user on a 1-way loop, route them forward to the end,
+    // then warp to the start, and continue to the destination.
     const startCoord = line.geometry.coordinates[0];
     const endCoord = line.geometry.coordinates[line.geometry.coordinates.length - 1];
+
     const pStart = turf.point(startCoord);
     const pEnd = turf.point(endCoord);
 
-    let part1, part2;
-    if (locStart <= locEnd) {
-      part1 = turf.lineSlice(pStart, startSnapped, line);
-      part1.geometry.coordinates.reverse();
+    // 1. Cut segment from User -> End of Route
+    const part1 = turf.lineSlice(startSnapped, pEnd, line);
 
-      part2 = turf.lineSlice(endSnapped, pEnd, line);
-      part2.geometry.coordinates.reverse();
-    } else {
-      part1 = turf.lineSlice(startSnapped, pEnd, line);
-      part2 = turf.lineSlice(pStart, endSnapped, line);
-    }
+    // 2. Cut segment from Start of Route -> Destination
+    const part2 = turf.lineSlice(pStart, endSnapped, line);
 
+    // 3. Concatenate these two segments to simulate a proper forward wrap-around.
+    // We pop the last coordinate of part1 to prevent duplicating the connection point.
     const mergedCoords = [...part1.geometry.coordinates];
     mergedCoords.pop();
     mergedCoords.push(...part2.geometry.coordinates);
+
     return turf.lineString(mergedCoords);
   }
 }
@@ -261,40 +254,45 @@ function findCoincidentTransfer(
   routeB: Feature<LineString>,
   maxGapMeters: number = 50
 ): { point: Feature<Point>; gapMeters: number } | null {
-  let lengthA = 0;
   try {
-    lengthA = turf.length(routeA, { units: 'kilometers' });
-  } catch (error) {
-    return null;
-  }
+    // V1 Enterprise Refactor: Main thread blocking via brute-force iterations fix
+    // Bounding Box pre-check for O(1) intersection elimination before iterating
+    const bboxA = turf.bbox(routeA);
+    const bboxB = turf.bbox(routeB);
 
-  let minPointsDistance = Infinity;
-  let bestTransferA: Feature<Point> | null = null;
+    // We expand bboxA by maxGapMeters (converted to approx degrees roughly, 111km = 1 degree)
+    const gapDeg = maxGapMeters / 111000;
 
-  // Sample every 100 meters (0.1 km) for better precision in finding proximity
-  for (let d = 0; d <= lengthA; d += 0.1) {
-    let pt: Feature<Point>;
-    try {
-      pt = turf.along(routeA, d, { units: 'kilometers' });
-    } catch(e) {
-      continue; // skip this sample if it fails
+    if (
+      bboxA[0] - gapDeg > bboxB[2] || // A is entirely right of B
+      bboxA[2] + gapDeg < bboxB[0] || // A is entirely left of B
+      bboxA[1] - gapDeg > bboxB[3] || // A is entirely above B
+      bboxA[3] + gapDeg < bboxB[1]    // A is entirely below B
+    ) {
+      return null;
     }
 
-    try {
+    let minPointsDistance = Infinity;
+    let bestTransferA: Feature<Point> | null = null;
+
+    // Strictly iterate over topological vertices instead of brute-force sampling
+    const coordsA = routeA.geometry.coordinates;
+    for (let i = 0; i < coordsA.length; i++) {
+      const pt = turf.point(coordsA[i]);
       const snapB = turf.nearestPointOnLine(routeB, pt);
       const gap = turf.distance(pt, snapB, { units: 'kilometers' }) * 1000;
-      // Check if it's the best gap, and if it's within the proximity rule
+
       if (gap < minPointsDistance && gap <= maxGapMeters) {
         minPointsDistance = gap;
         bestTransferA = pt;
       }
-    } catch(e) {
-      continue;
     }
-  }
 
-  if (bestTransferA) {
-    return { point: bestTransferA, gapMeters: minPointsDistance };
+    if (bestTransferA) {
+      return { point: bestTransferA, gapMeters: minPointsDistance };
+    }
+  } catch (error) {
+    // Graceful fallback for Turf.js geometry errors
   }
   return null;
 }
