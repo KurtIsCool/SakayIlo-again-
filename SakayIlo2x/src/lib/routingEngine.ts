@@ -470,7 +470,7 @@ export function calculateCommute(
   endLatLng: [number, number],
   routes: FeatureCollection<LineString>,
   maxWalkingDistance: number = 800
-): RouteResult | { error: string } | null {
+): RouteResult[] | { error: string } | null {
   try {
     // Convert basic lat/lng to Turf Point features.
     // Note: Turf uses [longitude, latitude] internally
@@ -480,18 +480,13 @@ export function calculateCommute(
     const directRoute = findDirectRoute(startPt, endPt, routes, maxWalkingDistance);
     const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);
 
-    if (directRoute && transferRoute) {
-      const directScore = calculateHeuristicCost(directRoute);
-      const transferScore = calculateHeuristicCost(transferRoute);
+    const results: RouteResult[] = [];
+    if (directRoute) results.push(directRoute);
+    if (transferRoute) results.push(transferRoute);
 
-      if (transferScore < directScore) {
-        return transferRoute;
-      }
-      return directRoute;
+    if (results.length > 0) {
+      return results.sort((a, b) => calculateHeuristicCost(a) - calculateHeuristicCost(b));
     }
-
-    if (directRoute) return directRoute;
-    if (transferRoute) return transferRoute;
 
     return null;
   } catch (error) {

@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
-import { Crosshair } from 'lucide-react';
-import { MapPin } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { MapPin, Crosshair, Loader2 } from 'lucide-react';
 import LocationPickerMap from './LocationPickerMap';
-
-export interface RouteResult {
-  id: string;
-  type: string; // e.g. '1 Ride: Direct', '2 Rides: Transfer'
-  description: string;
-}
+import { RouteResult as EngineRouteResult } from '../lib/routingEngine';
 
 const fetchAddress = async (lat: number, lng: number): Promise<string> => {
   try {
@@ -26,19 +19,17 @@ const fetchAddress = async (lat: number, lng: number): Promise<string> => {
 export interface SearchBottomSheetProps {
   onCalculateRoute?: (origin: [number, number], dest: [number, number]) => void;
   isLoading?: boolean;
-  results?: RouteResult[] | null;
-  onLocateOrigin?: (setCoords: (coords: [number, number]) => void) => void;
-  onPinOrigin?: (setCoords: (coords: [number, number]) => void) => void;
-  onPinDestination?: (setCoords: (coords: [number, number]) => void) => void;
+  routeOptions?: EngineRouteResult[] | null;
+  selectedRoute?: EngineRouteResult | null;
+  onSelectRoute?: (route: EngineRouteResult) => void;
 }
 
 const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   onCalculateRoute,
   isLoading: externalIsLoading = false,
-  results = null,
-  onLocateOrigin,
-  onPinOrigin,
-  onPinDestination,
+  routeOptions = null,
+  selectedRoute = null,
+  onSelectRoute,
 }) => {
   const [originText, setOriginText] = useState('');
   const [destinationText, setDestinationText] = useState('');
@@ -92,101 +83,130 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white rounded-[2rem] shadow-xl border-2 border-gray-100 p-6 flex flex-col gap-4 font-sans">
-      <h2 className="text-2xl font-extrabold text-gray-800 mb-2">Where do you want to go?</h2>
+    <>
+      {/* Panel A: Search Box */}
+      <div className="w-full bg-white rounded-[2rem] shadow-xl border-2 border-gray-100 p-6 flex flex-col gap-4 font-sans pointer-events-auto shrink-0 z-20 transition-all">
+        <h2 className="text-2xl font-extrabold text-gray-800 mb-2">Where do you want to go?</h2>
 
-      {/* Origin Input */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold uppercase text-gray-500">Origin</label>
-        <div className="relative w-full">
-          <input
-            type="text"
-            className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-20 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-            placeholder="Enter origin"
-            value={originText}
-            onChange={(e) => setOriginText(e.target.value)}
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <button
-              onClick={handleGeolocation}
-              className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
-              title="Use my location"
-            >
-              {isLocating ? (
-                <Loader2 className="animate-spin" size={20} strokeWidth={2.5} />
-              ) : (
-                <Crosshair size={20} strokeWidth={2.5} />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveMapPicker('origin')}
-              className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
-              title="Choose on map"
-            >
-              <MapPin size={20} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Destination Input */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold uppercase text-gray-500">Destination</label>
-        <div className="relative w-full">
-          <input
-            type="text"
-            className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-12 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-            placeholder="Enter destination"
-            value={destinationText}
-            onChange={(e) => setDestinationText(e.target.value)}
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-            <button
-              onClick={() => setActiveMapPicker('destination')}
-              className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
-              title="Choose on map"
-            >
-              <MapPin size={20} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Button */}
-      <div className="mt-4">
-        <button
-          onClick={handleSearch}
-          disabled={isLoading}
-          className={`w-full py-4 rounded-2xl font-extrabold text-white text-lg flex items-center justify-center gap-2 transition-all
-            ${isLoading
-              ? 'bg-emerald-400 cursor-not-allowed border-b-0 translate-y-1'
-              : 'bg-emerald-500 hover:bg-emerald-400 border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1'
-            }`}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="animate-spin" size={24} />
-              Loading...
-            </>
-          ) : (
-            'What to ride?'
-          )}
-        </button>
-      </div>
-
-      {/* Results View */}
-      {results && results.length > 0 && (
-        <div className="mt-6 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <h3 className="text-xs font-bold uppercase text-gray-500 mb-1">Route Options</h3>
-          {results.map((result) => (
-            <div
-              key={result.id}
-              className="bg-white border-2 border-gray-200 rounded-2xl p-4 hover:border-emerald-500 transition-colors cursor-pointer flex flex-col gap-1"
-            >
-              <span className="font-extrabold text-gray-800">{result.type}</span>
-              <span className="text-gray-600 text-sm font-medium">{result.description}</span>
+        {/* Origin Input */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold uppercase text-gray-500">Origin</label>
+          <div className="relative w-full">
+            <input
+              type="text"
+              className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-20 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+              placeholder="Enter origin"
+              value={originText}
+              onChange={(e) => setOriginText(e.target.value)}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <button
+                onClick={handleGeolocation}
+                className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
+                title="Use my location"
+              >
+                {isLocating ? (
+                  <Loader2 className="animate-spin" size={20} strokeWidth={2.5} />
+                ) : (
+                  <Crosshair size={20} strokeWidth={2.5} />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveMapPicker('origin')}
+                className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
+                title="Choose on map"
+              >
+                <MapPin size={20} strokeWidth={2.5} />
+              </button>
             </div>
-          ))}
+          </div>
+        </div>
+
+        {/* Destination Input */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold uppercase text-gray-500">Destination</label>
+          <div className="relative w-full">
+            <input
+              type="text"
+              className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl py-3 pl-4 pr-12 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+              placeholder="Enter destination"
+              value={destinationText}
+              onChange={(e) => setDestinationText(e.target.value)}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+              <button
+                onClick={() => setActiveMapPicker('destination')}
+                className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
+                title="Choose on map"
+              >
+                <MapPin size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="mt-2">
+          <button
+            onClick={handleSearch}
+            disabled={isLoading}
+            className={`w-full py-4 rounded-2xl font-extrabold text-white text-lg flex items-center justify-center gap-2 transition-all
+              ${isLoading
+                ? 'bg-emerald-400 cursor-not-allowed border-b-0 translate-y-1'
+                : 'bg-emerald-500 hover:bg-emerald-400 border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1'
+              }`}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={24} />
+                Loading...
+              </>
+            ) : (
+              'What to ride?'
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Panel B: Results Sidebar / Bottom Sheet */}
+      {routeOptions && routeOptions.length > 0 && (
+        <div className="w-full bg-white rounded-[2rem] shadow-xl border-2 border-gray-100 p-6 flex flex-col gap-4 font-sans pointer-events-auto z-20 flex-1 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <h3 className="text-xs font-bold uppercase text-gray-500 mb-1">Route Options</h3>
+          {routeOptions.map((result, idx) => {
+            const isSelected = selectedRoute === result;
+            const typeLabel = result.type === 'direct' ? '1 Ride: Direct' : '2 Rides: Transfer';
+            const distance = Math.round(result.totalDistance);
+            const time = Math.round(result.estimatedTravelTime);
+
+            // Extract jeepney names from steps
+            const jeepneySteps = result.steps.filter(s => s.mode === 'jeep');
+            const jeepNames = jeepneySteps.map(s => s.route).join(' ➔ ');
+
+            return (
+              <div
+                key={idx}
+                onClick={() => onSelectRoute && onSelectRoute(result)}
+                className={`border-2 rounded-2xl p-4 transition-all cursor-pointer flex flex-col gap-2
+                  ${isSelected
+                    ? 'border-emerald-500 bg-emerald-50 shadow-md'
+                    : 'border-gray-200 bg-white hover:border-emerald-300'
+                  }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className={`font-extrabold ${isSelected ? 'text-emerald-700' : 'text-gray-800'}`}>{typeLabel}</span>
+                  <span className="text-sm font-bold text-gray-500">{time} min</span>
+                </div>
+
+                <div className="text-sm font-bold text-gray-700">
+                  {jeepNames}
+                </div>
+
+                <div className="text-xs font-medium text-gray-500">
+                  Distance: {distance}m
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -247,7 +267,7 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
