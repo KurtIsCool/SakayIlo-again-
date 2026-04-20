@@ -19,17 +19,11 @@ const fetchAddress = async (lat: number, lng: number): Promise<string> => {
 export interface SearchBottomSheetProps {
   onCalculateRoute?: (origin: [number, number], dest: [number, number]) => void;
   isLoading?: boolean;
-  routeOptions?: EngineRouteResult[] | null;
-  selectedRoute?: EngineRouteResult | null;
-  onSelectRoute?: (route: EngineRouteResult) => void;
 }
 
 const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   onCalculateRoute,
   isLoading: externalIsLoading = false,
-  routeOptions = null,
-  selectedRoute = null,
-  onSelectRoute,
 }) => {
   const [originText, setOriginText] = useState('');
   const [destinationText, setDestinationText] = useState('');
@@ -167,48 +161,6 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Panel B: Results Sidebar / Bottom Sheet */}
-      {routeOptions && routeOptions.length > 0 && (
-        <div className="w-full bg-white rounded-[2rem] shadow-xl border-2 border-gray-100 p-6 flex flex-col gap-4 font-sans pointer-events-auto z-20 flex-1 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <h3 className="text-xs font-bold uppercase text-gray-500 mb-1">Route Options</h3>
-          {routeOptions.map((result, idx) => {
-            const isSelected = selectedRoute === result;
-            const typeLabel = result.type === 'direct' ? '1 Ride: Direct' : '2 Rides: Transfer';
-            const distance = Math.round(result.totalDistance);
-            const time = Math.round(result.estimatedTravelTime);
-
-            // Extract jeepney names from steps
-            const jeepneySteps = result.steps.filter(s => s.mode === 'jeep');
-            const jeepNames = jeepneySteps.map(s => s.route).join(' ➔ ');
-
-            return (
-              <div
-                key={idx}
-                onClick={() => onSelectRoute && onSelectRoute(result)}
-                className={`border-2 rounded-2xl p-4 transition-all cursor-pointer flex flex-col gap-2
-                  ${isSelected
-                    ? 'border-emerald-500 bg-emerald-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-emerald-300'
-                  }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className={`font-extrabold ${isSelected ? 'text-emerald-700' : 'text-gray-800'}`}>{typeLabel}</span>
-                  <span className="text-sm font-bold text-gray-500">{time} min</span>
-                </div>
-
-                <div className="text-sm font-bold text-gray-700">
-                  {jeepNames}
-                </div>
-
-                <div className="text-xs font-medium text-gray-500">
-                  Distance: {distance}m
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* Map Picker Modal */}
       {activeMapPicker && (

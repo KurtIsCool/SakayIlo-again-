@@ -3,7 +3,9 @@
 > vite --port=3000 --host=0.0.0.0
 
 
-  VITE v6.4.2  ready in 920 ms
+  VITE v6.4.2  ready in 482 ms
 
   ➜  Local:   http://localhost:3000/
   ➜  Network: http://192.168.0.2:3000/
+3:49:32 AM [vite] (client) hmr update /src/components/MapRouter.tsx, /src/index.css
+3:51:54 AM [vite] (client) page reload verify-frontend.js
