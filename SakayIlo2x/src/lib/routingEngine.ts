@@ -188,6 +188,9 @@ export function findDirectRoute(
 
         const totalDistance = s.distance + rideDistance + e.distance;
         
+        // Strict walk distance validation
+        if (s.distance + e.distance > maxWalkingDistance) continue;
+
         // Ensure that we don't pick routes where start and end snap to the exact same place (no ride at all)
         if (rideDistance < 100) continue;
 
@@ -338,6 +341,9 @@ export function findTransferRoutes(
         } catch (error) {
           continue;
         }
+
+        // Strict walk distance validation
+        if (s.distance + walkTransferDist + e.distance > maxWalkingDistance) continue;
 
         // Validate that the trip is logical and doesn't back-track endlessly
         if (ride1Dist < 100 || ride2Dist < 100) continue;
