@@ -4,8 +4,8 @@ import type { Coord } from '@turf/helpers';
 
 export interface RouteFeature extends Feature<LineString> {
   properties: {
-    id: string;
-    name: string;
+    route_id: string;
+    route_name: string;
     color: string;
   };
 }
@@ -174,7 +174,7 @@ export function findDirectRoute(
   // Compare all possible single-ride combinations
   for (const s of startNearby) {
     for (const e of endNearby) {
-      if (s.route.properties.id === e.route.properties.id) {
+      if (s.route.properties.route_id === e.route.properties.route_id) {
         // Direct route geometry sliced specifically for this trip
         const rideSegment = getLineSlice(s.nearestPoint, e.nearestPoint, s.route);
         if (!rideSegment) continue;
@@ -225,14 +225,14 @@ export function findDirectRoute(
             steps: [
               {
                 mode: 'walk',
-                instruction: `Walk to ${s.route.properties.name} route`,
+                instruction: `Walk to ${s.route.properties.route_name} route`,
                 distance: Math.round(s.distance)
               },
               {
                 mode: 'jeep',
-                route: s.route.properties.name,
+                route: s.route.properties.route_name,
                 color: s.route.properties.color,
-                instruction: `Ride ${s.route.properties.name} jeepney`,
+                instruction: `Ride ${s.route.properties.route_name} jeepney`,
                 distance: Math.round(rideDistance)
               },
               {
@@ -317,7 +317,7 @@ export function findTransferRoutes(
 
   for (const s of startNearby) {
     for (const e of endNearby) {
-      if (s.route.properties.id === e.route.properties.id) continue; // Skip identical routes
+      if (s.route.properties.route_id === e.route.properties.route_id) continue; // Skip identical routes
 
       const transferResult = findCoincidentTransfer(
         s.route as Feature<LineString>,
@@ -367,14 +367,14 @@ export function findTransferRoutes(
           const stepsObj: Step[] = [
             {
               mode: 'walk',
-              instruction: `Walk to ${s.route.properties.name} route`,
+              instruction: `Walk to ${s.route.properties.route_name} route`,
               distance: Math.round(s.distance)
             },
             {
               mode: 'jeep',
-              route: s.route.properties.name,
+              route: s.route.properties.route_name,
               color: s.route.properties.color,
-              instruction: `Ride ${s.route.properties.name} jeepney`,
+              instruction: `Ride ${s.route.properties.route_name} jeepney`,
               distance: Math.round(ride1Dist)
             }
           ];
@@ -382,7 +382,7 @@ export function findTransferRoutes(
           if (walkTransferDist > 0) {
             stepsObj.push({
               mode: 'walk',
-              instruction: `Walk to ${e.route.properties.name} transfer point`,
+              instruction: `Walk to ${e.route.properties.route_name} transfer point`,
               distance: Math.round(walkTransferDist)
             });
           }
@@ -390,14 +390,14 @@ export function findTransferRoutes(
           stepsObj.push(
             {
               mode: 'transfer',
-              instruction: `Alight and transfer to ${e.route.properties.name}`,
+              instruction: `Alight and transfer to ${e.route.properties.route_name}`,
               distance: 0
             },
             {
               mode: 'jeep',
-              route: e.route.properties.name,
+              route: e.route.properties.route_name,
               color: e.route.properties.color,
-              instruction: `Ride ${e.route.properties.name} jeepney`,
+              instruction: `Ride ${e.route.properties.route_name} jeepney`,
               distance: Math.round(ride2Dist)
             },
             {
