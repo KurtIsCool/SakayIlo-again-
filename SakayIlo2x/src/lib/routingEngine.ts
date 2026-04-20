@@ -47,19 +47,44 @@ export function findNearbyRoutes(
 ): { route: RouteFeature; nearestPoint: Feature<Point>; distance: number }[] {
   const nearby: { route: RouteFeature; nearestPoint: Feature<Point>; distance: number }[] = [];
 
-  turf.featureEach(routes, (route) => {
-    // Snap point to route to find the nearest boarding location
-    const routeLine = route as Feature<LineString>;
-    const snapped = turf.nearestPointOnLine(routeLine, point);
-    // Calculate actual distance from point to snapped coordinate in meters
-    const dist = turf.distance(point, snapped, { units: 'kilometers' }) * 1000;
+  // Convert max walking distance from meters to approx degrees for BBox check
+  const searchEnvelopeDeg = maxWalkingDistance / 111000;
 
-    if (dist <= maxWalkingDistance) {
-      nearby.push({
-        route: route as RouteFeature,
-        nearestPoint: snapped,
-        distance: dist,
-      });
+  // Use turf.getCoord to safely handle Point Features or raw coordinate arrays
+  const ptCoords = turf.getCoord(point);
+
+  const searchBbox = [
+    ptCoords[0] - searchEnvelopeDeg,
+    ptCoords[1] - searchEnvelopeDeg,
+    ptCoords[0] + searchEnvelopeDeg,
+    ptCoords[1] + searchEnvelopeDeg
+  ];
+
+  turf.featureEach(routes, (route) => {
+    const routeLine = route as Feature<LineString>;
+    const routeBbox = turf.bbox(routeLine);
+
+    // Fast BBox overlap check before heavy turf.nearestPointOnLine
+    const overlaps = !(
+      searchBbox[0] > routeBbox[2] ||
+      searchBbox[2] < routeBbox[0] ||
+      searchBbox[1] > routeBbox[3] ||
+      searchBbox[3] < routeBbox[1]
+    );
+
+    if (overlaps) {
+      // Snap point to route to find the nearest boarding location
+      const snapped = turf.nearestPointOnLine(routeLine, point);
+      // Calculate actual distance from point to snapped coordinate in meters
+      const dist = turf.distance(point, snapped, { units: 'kilometers' }) * 1000;
+
+      if (dist <= maxWalkingDistance) {
+        nearby.push({
+          route: route as RouteFeature,
+          nearestPoint: snapped,
+          distance: dist,
+        });
+      }
     }
   });
 
@@ -78,9 +103,8 @@ function isLoop(line: Feature<LineString>): boolean {
 }
 
 /**
- * Computes the shortest slice on a closed loop line string.
- * A loop offers two directions of travel. We compute both the direct "inner" slice
- * and the "wrap-around" slice, returning the shortest one.
+ * Computes the slice on a closed loop line string for 1-way forward travel.
+ * Never reverses coordinates to strictly avoid routing backwards.
  */
 function getShortestLoopSlice(
   startSnapped: Feature<Point>,
@@ -90,39 +114,27 @@ function getShortestLoopSlice(
   const locStart = startSnapped.properties?.location || 0;
   const locEnd = endSnapped.properties?.location || 0;
 
-  const innerSlice = turf.lineSlice(startSnapped, endSnapped, line);
-  const innerDist = turf.length(innerSlice, { units: 'kilometers' });
-
-  const totalLength = turf.length(line, { units: 'kilometers' });
-  const wrapAroundDist = totalLength - innerDist;
-
-  if (innerDist <= wrapAroundDist) {
-    const coords = innerSlice.geometry.coordinates;
-    if (locStart > locEnd) {
-      coords.reverse();
-    }
-    return turf.lineString(coords);
+  // If the destination is ahead of the user on the 1-way loop
+  if (locStart <= locEnd) {
+    return turf.lineSlice(startSnapped, endSnapped, line);
   } else {
+    // If destination is behind the user, simulate a forward wrap-around.
+    // Assuming looped routes are formatted as closed rings (First Coord = Last Coord).
     const startCoord = line.geometry.coordinates[0];
     const endCoord = line.geometry.coordinates[line.geometry.coordinates.length - 1];
     const pStart = turf.point(startCoord);
     const pEnd = turf.point(endCoord);
 
-    let part1, part2;
-    if (locStart <= locEnd) {
-      part1 = turf.lineSlice(pStart, startSnapped, line);
-      part1.geometry.coordinates.reverse();
-
-      part2 = turf.lineSlice(endSnapped, pEnd, line);
-      part2.geometry.coordinates.reverse();
-    } else {
-      part1 = turf.lineSlice(startSnapped, pEnd, line);
-      part2 = turf.lineSlice(pStart, endSnapped, line);
-    }
+    // Segment 1: User -> End of Route
+    const part1 = turf.lineSlice(startSnapped, pEnd, line);
+    // Segment 2: Start of Route -> Destination
+    const part2 = turf.lineSlice(pStart, endSnapped, line);
 
     const mergedCoords = [...part1.geometry.coordinates];
+    // Remove the duplicated last/first coordinate to ensure continuous string
     mergedCoords.pop();
     mergedCoords.push(...part2.geometry.coordinates);
+
     return turf.lineString(mergedCoords);
   }
 }
