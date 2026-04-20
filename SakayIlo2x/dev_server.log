@@ -3,7 +3,12 @@
 > vite --port=3000 --host=0.0.0.0
 
 
-  VITE v6.4.2  ready in 586 ms
+  VITE v6.4.2  ready in 513 ms
 
   ➜  Local:   http://localhost:3000/
   ➜  Network: http://192.168.0.2:3000/
+4:15:51 AM [vite] (client) hmr update /src/components/RouteResultsPanel.tsx, /src/index.css
+4:23:43 AM [vite] (client) hmr update /src/components/RouteResultsPanel.tsx, /src/index.css
+4:26:22 AM [vite] (client) hmr update /src/components/RouteResultsPanel.tsx, /src/index.css
+4:31:41 AM [vite] (client) hmr update /src/components/RouteResultsPanel.tsx, /src/index.css
+4:33:50 AM [vite] (client) page reload verify_frontend.mjs
