@@ -32,7 +32,32 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
   const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
   const [localIsLoading, setLocalIsLoading] = useState(false);
 
+  const [isLocating, setIsLocating] = useState(false);
+  const [activeMapPicker, setActiveMapPicker] = useState<'origin' | 'destination' | null>(null);
+
   const isLoading = externalIsLoading || localIsLoading;
+
+  const handleGeolocation = () => {
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setOriginCoords([latitude, longitude]);
+        setOriginText('Current Location');
+        setIsLocating(false);
+      },
+      (error) => {
+        alert(`Error getting location: ${error.message}`);
+        setIsLocating(false);
+      }
+    );
+  };
 
   const handleSearch = () => {
     setLocalIsLoading(true);
@@ -74,14 +99,18 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button
-              onClick={() => onLocateOrigin && onLocateOrigin(setOriginCoords)}
+              onClick={handleGeolocation}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Use my location"
             >
-              <Crosshair size={20} strokeWidth={2.5} />
+              {isLocating ? (
+                <Loader2 className="animate-spin" size={20} strokeWidth={2.5} />
+              ) : (
+                <Crosshair size={20} strokeWidth={2.5} />
+              )}
             </button>
             <button
-              onClick={() => onPinOrigin && onPinOrigin(setOriginCoords)}
+              onClick={() => setActiveMapPicker('origin')}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Choose on map"
             >
@@ -104,7 +133,7 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
             <button
-              onClick={() => onPinDestination && onPinDestination(setDestCoords)}
+              onClick={() => setActiveMapPicker('destination')}
               className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-colors"
               title="Choose on map"
             >
@@ -149,6 +178,56 @@ const SearchBottomSheet: React.FC<SearchBottomSheetProps> = ({
               <span className="text-gray-600 text-sm font-medium">{result.description}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Map Picker Modal */}
+      {activeMapPicker && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex flex-col items-center justify-end animate-in fade-in duration-300 pointer-events-auto">
+          <div className="bg-white w-full h-[80vh] rounded-t-[2rem] shadow-2xl flex flex-col pointer-events-auto">
+            {/* Modal Header */}
+            <div className="p-4 flex justify-between items-center border-b-2 border-gray-100">
+              <h3 className="text-lg font-extrabold text-gray-800">
+                {activeMapPicker === 'origin' ? 'Select Origin on Map' : 'Select Destination on Map'}
+              </h3>
+              <button
+                onClick={() => setActiveMapPicker(null)}
+                className="text-gray-400 hover:text-gray-600 font-bold p-2"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Map Placeholder */}
+            <div className="flex-1 bg-gray-100 relative">
+              {/* Future Leaflet Component Injection Here */}
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-bold">
+                Map goes here
+              </div>
+            </div>
+
+            {/* Modal Footer / Confirm Button */}
+            <div className="p-6 bg-white border-t-2 border-gray-100">
+              <button
+                onClick={() => {
+                  // Simulate confirming location, for now just sets a dummy location.
+                  // Real integration will fetch actual map center coordinates.
+                  const dummyCoords: [number, number] = [10.706, 122.558]; // Iloilo dummy default
+                  if (activeMapPicker === 'origin') {
+                    setOriginCoords(dummyCoords);
+                    setOriginText('Map Location'); // You could reverse geocode this later
+                  } else {
+                    setDestCoords(dummyCoords);
+                    setDestinationText('Map Location');
+                  }
+                  setActiveMapPicker(null);
+                }}
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 rounded-2xl font-extrabold text-white text-lg border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition-all"
+              >
+                Confirm Location
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
