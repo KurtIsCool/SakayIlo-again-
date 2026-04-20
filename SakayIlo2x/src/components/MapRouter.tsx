@@ -115,10 +115,10 @@ export default function MapRouter() {
           {destCoords && <Marker position={destCoords} icon={endIcon}><Popup minWidth={90}><strong>Destination</strong></Popup></Marker>}
 
           {/* Render the computed route segments if found */}
-          {selectedRoute && selectedRoute.pathGeoJSON && selectedRoute.pathGeoJSON.features.map((f: any, i: number) => {
-            const coords = f.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
+          {selectedRoute && selectedRoute.pathGeoJSON && selectedRoute.pathGeoJSON.features.map((feature: any, i: number) => {
+            const positions = feature.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
 
-            const mode = f.properties?.mode;
+            const mode = feature.properties?.mode;
             let color = '#000000';
             let weight = 6;
             let dashArray = undefined;
@@ -128,7 +128,7 @@ export default function MapRouter() {
               weight = 4;
               dashArray = '5, 10';
             } else if (mode === 'jeep') {
-              color = f.properties?.color || '#000000';
+              color = feature.properties?.color || '#000000';
               weight = 6;
             } else if (mode === 'transfer') {
               color = '#3B82F6';
@@ -139,7 +139,7 @@ export default function MapRouter() {
             return (
               <Polyline
                 key={`computed-route-${i}`}
-                positions={coords}
+                positions={positions}
                 pathOptions={{ color, weight, opacity: 0.8, dashArray }}
               />
             );
@@ -156,7 +156,7 @@ export default function MapRouter() {
         <RouteResultsPanel
           routeOptions={routeOptions}
           selectedRoute={selectedRoute}
-          onSelectRoute={setSelectedRoute}
+          onSelectRoute={(route) => setSelectedRoute(route)}
           onClear={handleClear}
         />
       </div>

@@ -32,19 +32,19 @@ export default function RouteResultsPanel({
         </button>
       </div>
 
-      {routeOptions.map((result, idx) => {
-        const isSelected = selectedRoute === result;
-        const typeLabel = result.type === 'direct' ? '1 Ride: Direct' : '2 Rides: Transfer';
-        const distance = Math.round(result.totalDistance);
-        const time = Math.round(result.estimatedTravelTime);
+      {routeOptions.map((option, idx) => {
+        const isSelected = selectedRoute === option;
+        const typeLabel = option.type === 'direct' ? '1 Ride: Direct' : '2 Rides: Transfer';
+        const distance = Math.round(option.totalDistance);
+        const time = Math.round(option.estimatedTravelTime);
 
         // Extract jeepney steps to render them properly
-        const jeepneySteps = result.steps.filter((s) => s.mode === 'jeep');
+        const jeepneySteps = option.steps.filter((s) => s.mode === 'jeep');
 
         return (
           <div
             key={idx}
-            onClick={() => onSelectRoute(result)}
+            onClick={() => onSelectRoute(option)}
             className={`border-2 rounded-2xl p-4 transition-all cursor-pointer flex flex-col gap-2
               ${
                 isSelected
@@ -66,6 +66,7 @@ export default function RouteResultsPanel({
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: step.color || '#000' }}
                   />
+                  {/* Displaying the route property (jeepney name) */}
                   <span className="text-sm font-bold text-gray-700">{step.route}</span>
                 </div>
               ))}
