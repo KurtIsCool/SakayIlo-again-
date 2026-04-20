@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { calculateCommute, RouteResult } from '../lib/routingEngine';
-// Remove import, using fetch now
-// import { iloiloRoutes } from '../data/iloiloRoutes';
+import { RouteResult } from '../lib/routingEngine';
 import { loadRoutes } from '../dataLoader';
 
 // Fix typical leaflet icon issue in react
@@ -35,56 +33,14 @@ const endIcon = new L.Icon({
 });
 
 interface MapRouterProps {
-  onRouteResult: (result: RouteResult | null) => void;
-  maxWalkingDistance: number;
+  selectedRoute: RouteResult | null;
+  originCoords: [number, number] | null;
+  destCoords: [number, number] | null;
 }
 
 const DEFAULT_CENTER: [number, number] = [10.706, 122.558]; // Iloilo City center roughly
 
-function DraggableMarker({
-  position,
-  setPosition,
-  icon,
-  label
-}: {
-  position: [number, number];
-  setPosition: (pos: [number, number]) => void;
-  icon: L.Icon;
-  label: string;
-}) {
-  const markerRef = React.useRef<L.Marker>(null);
-  const eventHandlers = useMemo(
-    () => ({
-      dragend() {
-        const marker = markerRef.current;
-        if (marker != null) {
-          const latLng = marker.getLatLng();
-          setPosition([latLng.lat, latLng.lng]);
-        }
-      },
-    }),
-    [setPosition],
-  );
-
-  return (
-    <Marker
-      draggable={true}
-      eventHandlers={eventHandlers}
-      position={position}
-      icon={icon}
-      ref={markerRef}
-    >
-      <Popup minWidth={90}>
-        <strong>{label}</strong> <br/> Drag to change.
-      </Popup>
-    </Marker>
-  );
-}
-
-export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRouterProps) {
-  const [startPos, setStartPos] = useState<[number, number]>([10.722, 122.556]); // Jaro Plaza
-  const [endPos, setEndPos] = useState<[number, number]>([10.6974, 122.5644]); // Plaza Libertad
-  const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
+export default function MapRouter({ selectedRoute, originCoords, destCoords }: MapRouterProps) {
   const [routesData, setRoutesData] = useState<any>(null);
 
   useEffect(() => {
@@ -92,15 +48,6 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
       setRoutesData(data);
     });
   }, []);
-
-  // Re-calculate route when start/end/walking distance changes
-  // useEffect(() => {
-  //   if (!routesData) return;
-  //   // Note: routing engine expects [lat, lng]
-  //   const result = calculateCommute(startPos, endPos, routesData, maxWalkingDistance);
-  //   setRouteResult(result as RouteResult);
-  //   onRouteResult(result as RouteResult);
-  // }, [startPos, endPos, maxWalkingDistance, routesData, onRouteResult]);
 
   return (
     <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom={true} className="w-full h-full rounded-xl shadow-inner z-0">
@@ -121,11 +68,11 @@ export default function MapRouter({ onRouteResult, maxWalkingDistance }: MapRout
         );
       })}
 
-      <DraggableMarker position={startPos} setPosition={setStartPos} icon={startIcon} label="Start Point" />
-      <DraggableMarker position={endPos} setPosition={setEndPos} icon={endIcon} label="End Destination" />
+      {originCoords && <Marker position={originCoords} icon={startIcon}><Popup minWidth={90}><strong>Origin</strong></Popup></Marker>}
+      {destCoords && <Marker position={destCoords} icon={endIcon}><Popup minWidth={90}><strong>Destination</strong></Popup></Marker>}
 
       {/* Render the computed route segments if found */}
-      {routeResult && routeResult.pathGeoJSON && routeResult.pathGeoJSON.features.map((f, i) => {
+      {selectedRoute && selectedRoute.pathGeoJSON && selectedRoute.pathGeoJSON.features.map((f: any, i: number) => {
         const coords = f.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
 
         const mode = f.properties?.mode;
