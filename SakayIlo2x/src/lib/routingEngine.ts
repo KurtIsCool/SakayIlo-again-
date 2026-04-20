@@ -1,6 +1,7 @@
 import * as turf from '@turf/turf';
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import type { Coord } from '@turf/helpers';
+import { LeafletLatLng, toTurfPosition } from './coordinates';
 
 export interface RouteFeature extends Feature<LineString> {
   properties: {
@@ -472,16 +473,15 @@ function calculateHeuristicCost(route: RouteResult): number {
  * Main engine entry point to find the optimal commute
  */
 export function calculateCommute(
-  startLatLng: [number, number],
-  endLatLng: [number, number],
+  startLatLng: LeafletLatLng,
+  endLatLng: LeafletLatLng,
   routes: FeatureCollection<LineString>,
   maxWalkingDistance: number = 800
 ): RouteResult[] | { error: string } | null {
   try {
-    // Convert basic lat/lng to Turf Point features.
-    // Note: Turf uses [longitude, latitude] internally
-    const startPt = turf.point([startLatLng[1], startLatLng[0]]);
-    const endPt = turf.point([endLatLng[1], endLatLng[0]]);
+    // Convert Leaflet [lat, lng] to Turf Point features [lng, lat]
+    const startPt = turf.point(toTurfPosition(startLatLng));
+    const endPt = turf.point(toTurfPosition(endLatLng));
 
     const directRoute = findDirectRoute(startPt, endPt, routes, maxWalkingDistance);
     const transferRoute = findTransferRoutes(startPt, endPt, routes, maxWalkingDistance);

@@ -6,6 +6,7 @@ import { RouteResult, calculateCommute } from '../lib/routingEngine';
 import { loadRoutes } from '../dataLoader';
 import SearchBottomSheet from './SearchBottomSheet';
 import RouteResultsPanel from './RouteResultsPanel';
+import { LeafletLatLng, toLeafletLatLng } from '../lib/coordinates';
 
 // Fix typical leaflet icon issue in react
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -34,7 +35,7 @@ const endIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const DEFAULT_CENTER: [number, number] = [10.706, 122.558]; // Iloilo City center roughly
+const DEFAULT_CENTER: LeafletLatLng = [10.706, 122.558]; // Iloilo City center roughly
 
 export default function MapRouter() {
   const [routesData, setRoutesData] = useState<any>(null);
@@ -43,8 +44,8 @@ export default function MapRouter() {
   const [routeOptions, setRouteOptions] = useState<RouteResult[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<RouteResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
-  const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
+  const [originCoords, setOriginCoords] = useState<LeafletLatLng | null>(null);
+  const [destCoords, setDestCoords] = useState<LeafletLatLng | null>(null);
   const [originText, setOriginText] = useState('');
   const [destText, setDestText] = useState('');
 
@@ -110,7 +111,7 @@ export default function MapRouter() {
 
           {/* Background jeepney routes mapping */}
           {routesData && routesData.features.map((feature: any, idx: number) => {
-            const coords = feature.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
+            const coords = feature.geometry.coordinates.map((c: any) => toLeafletLatLng(c));
             return (
               <Polyline
                 key={`bg-route-${idx}`}
@@ -125,7 +126,7 @@ export default function MapRouter() {
 
           {/* Render the computed route segments if found */}
           {selectedRoute && selectedRoute.pathGeoJSON && selectedRoute.pathGeoJSON.features.map((feature: any, i: number) => {
-            const positions = feature.geometry.coordinates.map((c: any) => [c[1], c[0]] as [number, number]);
+            const positions = feature.geometry.coordinates.map((c: any) => toLeafletLatLng(c));
 
             const mode = feature.properties?.mode;
             let color = '#000000';

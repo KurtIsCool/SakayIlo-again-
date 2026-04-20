@@ -2,6 +2,7 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { LeafletLatLng } from '../lib/coordinates';
 
 // Fix for default marker icons in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -13,7 +14,7 @@ L.Icon.Default.mergeOptions({
 });
 
 interface LocationPickerMapProps {
-  initialPosition?: [number, number];
+  initialPosition?: LeafletLatLng;
   onPositionChange: (lat: number, lng: number) => void;
 }
 
