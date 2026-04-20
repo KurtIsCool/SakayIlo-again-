@@ -1,19 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { calculateCommute, RouteResult } from '../lib/routingEngine';
 // Remove import, using fetch now
 // import { iloiloRoutes } from '../data/iloiloRoutes';
 import { loadRoutes } from '../dataLoader';
-
-// Fix typical leaflet icon issue in react
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
 
 // Custom icons for Start and End
 const startIcon = new L.Icon({

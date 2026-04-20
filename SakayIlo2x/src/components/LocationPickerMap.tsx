@@ -1,16 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix for default marker icons in React Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+import type { Marker as LMarker } from 'leaflet';
 
 interface LocationPickerMapProps {
   initialPosition?: [number, number];
@@ -22,7 +12,7 @@ const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   onPositionChange,
 }) => {
   const [position, setPosition] = useState(initialPosition);
-  const markerRef = useRef<L.Marker>(null);
+  const markerRef = useRef<LMarker>(null);
 
   const eventHandlers = useMemo(
     () => ({
