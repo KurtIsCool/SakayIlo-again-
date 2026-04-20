@@ -10,14 +10,23 @@ export interface RouteResult {
   description: string;
 }
 
+const geocodingCache = new Map<string, string>();
+
 const fetchAddress = async (lat: number, lng: number): Promise<string> => {
+  const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  if (geocodingCache.has(cacheKey)) {
+    return geocodingCache.get(cacheKey)!;
+  }
+
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
     const data = await res.json();
+    let address = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
     if (data.address) {
-      return data.address.road || data.address.neighbourhood || (data.display_name && data.display_name.split(',')[0]) || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+      address = data.address.road || data.address.neighbourhood || (data.display_name && data.display_name.split(',')[0]) || address;
     }
-    return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+    geocodingCache.set(cacheKey, address);
+    return address;
   } catch (err) {
     return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
   }
