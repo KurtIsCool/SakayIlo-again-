@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Crosshair, Loader2 } from 'lucide-react';
 import LocationPickerMap from './LocationPickerMap';
-import { RouteResult as EngineRouteResult } from '../lib/routingEngine';
 
 const fetchAddress = async (lat: number, lng: number): Promise<string> => {
   try {
